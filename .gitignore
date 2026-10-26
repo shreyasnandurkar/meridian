@@ -24,3 +24,6 @@ Thumbs.db
 # Local-only files
 CLAUDE.md
 docs/DECISIONS.md
+
+# Brag launch video output
+brag-output/
