@@ -38,3 +38,7 @@ meridian:
     timeout-seconds: ${AI_TIMEOUT_SECONDS:90}
   places:
     provider: ${PLACES_PROVIDER:osm}
+    overpass-url: ${OVERPASS_URL:https://overpass-api.de/api/interpreter}
+    nominatim-url: ${NOMINATIM_URL:https://nominatim.openstreetmap.org}
+    radius-km: 50
+    cache-ttl: P7D

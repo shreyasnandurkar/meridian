@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.context.MessageSourceResolvable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -25,6 +26,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(ex.getStatus(), ex.getMessage());
         pd.setTitle(ex.getTitle());
         ex.getProperties().forEach(pd::setProperty);
+        return pd;
+    }
+
+    /** A unique constraint lost a race with a concurrent request (the service checks first in the common case). */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ProblemDetail handleIntegrity(DataIntegrityViolationException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "That conflicts with a change someone just made. Refresh and try again.");
+        pd.setTitle("Conflict");
         return pd;
     }
 

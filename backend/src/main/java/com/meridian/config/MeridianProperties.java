@@ -16,5 +16,9 @@ public record MeridianProperties(String appBaseUrl, Jwt jwt, Ai ai, Places place
             int maxConcurrency,
             int timeoutSeconds) {}
 
-    public record Places(String provider) {}
+    /**
+     * @param radiusKm default search radius around the trip destination
+     * @param cacheTtl how long a provider answer is reused before it is fetched again
+     */
+    public record Places(String provider, String overpassUrl, String nominatimUrl, int radiusKm, Duration cacheTtl) {}
 }

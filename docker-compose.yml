@@ -33,6 +33,8 @@ services:
       AI_MAX_CONCURRENCY: ${AI_MAX_CONCURRENCY:-1}
       AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-90}
       PLACES_PROVIDER: ${PLACES_PROVIDER:-osm}
+      OVERPASS_URL: ${OVERPASS_URL:-https://overpass-api.de/api/interpreter}
+      NOMINATIM_URL: ${NOMINATIM_URL:-https://nominatim.openstreetmap.org}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
     extra_hosts:
       - "host.docker.internal:host-gateway"

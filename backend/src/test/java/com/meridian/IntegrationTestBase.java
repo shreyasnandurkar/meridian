@@ -10,13 +10,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 
-/** Shared Spring context + one Postgres container for all integration tests. AI is off so tests are deterministic. */
+/** Shared Spring context + one Postgres container for all integration tests. AI is off and OpenStreetMap is faked so tests are deterministic. */
 @SpringBootTest(properties = "meridian.ai.enabled=false")
 @AutoConfigureMockMvc
+@Import(FakePlacesClient.Config.class)
 public abstract class IntegrationTestBase {
 
     @ServiceConnection

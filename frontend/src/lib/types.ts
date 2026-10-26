@@ -168,3 +168,84 @@ export interface GeoResult {
   lng: number;
   type: string;
 }
+
+export type PlaceCategory = "SIGHTS" | "FOOD" | "STAYS" | "ACTIVITIES" | "OTHER";
+
+export interface Place {
+  id: string;
+  source: string;
+  sourceId: string;
+  sourceUrl: string | null;
+  name: string;
+  category: PlaceCategory;
+  lat: number;
+  lng: number;
+  address: string | null;
+  website: string | null;
+  tags: Record<string, string>;
+  popularityProxy: number;
+  fetchedAt: string;
+}
+
+/** Places with their provenance; `stale` means the provider was down and these are older stored results. */
+export interface PlaceResults {
+  places: Place[];
+  source: string;
+  fetchedAt: string | null;
+  stale: boolean;
+}
+
+export type ShortlistKind = "PLACE" | "LINK" | "PIN";
+export type ReactionValue = "LOVE" | "OK" | "NO_WAY";
+
+export interface ShortlistReaction {
+  userId: string;
+  displayName: string;
+  value: ReactionValue;
+  reason: string | null;
+  updatedAt: string;
+}
+
+export interface ShortlistItem {
+  id: string;
+  kind: ShortlistKind;
+  title: string;
+  category: PlaceCategory;
+  place: Place | null;
+  url: string | null;
+  host: string | null;
+  lat: number | null;
+  lng: number | null;
+  addedBy: { userId: string; displayName: string };
+  reason: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  reactions: ShortlistReaction[];
+  canEdit: boolean;
+}
+
+export interface AddShortlistInput {
+  kind: ShortlistKind;
+  placeId?: string;
+  url?: string;
+  title?: string;
+  lat?: number;
+  lng?: number;
+  category?: PlaceCategory;
+  reason?: string;
+  notes?: string;
+}
+
+export interface UpdateShortlistInput {
+  category?: PlaceCategory;
+  title?: string;
+  reason?: string;
+  notes?: string;
+}
+
+export interface LinkPreview {
+  url: string;
+  host: string;
+  title: string | null;
+}

@@ -10,12 +10,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/lib/auth";
 import { formatDateRange, formatMoney } from "@/lib/format";
+import { useShortlist } from "@/lib/queries";
 import type { TripDetail } from "@/lib/types";
 
 export function OverviewTab({ trip }: { trip: TripDetail }) {
   const { user } = useAuth();
   const contributed = trip.members.filter((m) => m.hasProfile).length;
   const me = trip.members.find((m) => m.userId === user?.id);
+  const shortlist = useShortlist(trip.id);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
@@ -62,6 +64,18 @@ export function OverviewTab({ trip }: { trip: TripDetail }) {
               <Row label="Dates" value={`${formatDateRange(trip.startDate, trip.endDate)} (${trip.days} days)`} />
               <Row label="Rough budget per person" value={formatMoney(trip.budgetTotal, trip.currency)} />
               <Row label="Decisions" value={trip.quorum.description} />
+              <div>
+                <dt className="text-muted-foreground text-xs">Shortlist</dt>
+                <dd className="mt-0.5">
+                  {shortlist.data == null ? (
+                    "…"
+                  ) : (
+                    <Link href={`/trips/${trip.id}?tab=shortlist`} className="underline decoration-contour underline-offset-4 hover:decoration-signal">
+                      {shortlist.data.length} {shortlist.data.length === 1 ? "place" : "places"}
+                    </Link>
+                  )}
+                </dd>
+              </div>
             </dl>
           </CardContent>
         </Card>

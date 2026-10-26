@@ -4,18 +4,25 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 import type {
+  AddShortlistInput,
   AiJob,
   AiStatus,
   CreateTripInput,
   GeoResult,
   Invite,
   InvitePreview,
+  LinkPreview,
+  PlaceCategory,
+  PlaceResults,
   ProfileView,
   QuizAnswers,
+  ReactionValue,
+  ShortlistItem,
   TravelProfile,
   TripDetail,
   TripPreferences,
   TripSummary,
+  UpdateShortlistInput,
   Vocabulary,
 } from "@/lib/types";
 
@@ -30,6 +37,9 @@ export const keys = {
   preferences: (tripId: string) => ["trip", tripId, "preferences"] as const,
   invite: (token: string) => ["invite", token] as const,
   geo: (q: string) => ["geo", q] as const,
+  shortlist: (tripId: string) => ["trip", tripId, "shortlist"] as const,
+  placeSearch: (tripId: string, q: string) => ["trip", tripId, "places", "search", q] as const,
+  nearby: (tripId: string, category: PlaceCategory) => ["trip", tripId, "places", "nearby", category] as const,
 };
 
 export function useVocabulary() {
@@ -181,5 +191,113 @@ export function useGeoSearch(q: string) {
     enabled: query.length >= 3,
     staleTime: Infinity,
     retry: false,
+  });
+}
+
+export function useShortlist(tripId: string) {
+  return useQuery({
+    queryKey: keys.shortlist(tripId),
+    queryFn: () => api<ShortlistItem[]>(`/api/trips/${tripId}/shortlist`),
+  });
+}
+
+function replaceItem(list: ShortlistItem[] | undefined, item: ShortlistItem) {
+  return list?.map((i) => (i.id === item.id ? item : i));
+}
+
+export function useAddShortlistItem(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AddShortlistInput) =>
+      api<ShortlistItem>(`/api/trips/${tripId}/shortlist`, { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: (item) =>
+      qc.setQueryData<ShortlistItem[]>(keys.shortlist(tripId), (old) => [item, ...(old ?? [])]),
+  });
+}
+
+export function useUpdateShortlistItem(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateShortlistInput }) =>
+      api<ShortlistItem>(`/api/trips/${tripId}/shortlist/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+    onSuccess: (item) => qc.setQueryData<ShortlistItem[]>(keys.shortlist(tripId), (old) => replaceItem(old, item)),
+  });
+}
+
+export function useRemoveShortlistItem(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/api/trips/${tripId}/shortlist/${id}`, { method: "DELETE" }),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: keys.shortlist(tripId) });
+      const previous = qc.getQueryData<ShortlistItem[]>(keys.shortlist(tripId));
+      qc.setQueryData<ShortlistItem[]>(keys.shortlist(tripId), (old) => old?.filter((i) => i.id !== id));
+      return { previous };
+    },
+    onError: (_e, _id, ctx) => qc.setQueryData(keys.shortlist(tripId), ctx?.previous),
+  });
+}
+
+/** Sets (or with `value: null` clears) the current user's reaction, optimistically. */
+export function useReact(tripId: string, me: { id: string; displayName: string }) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, value, reason }: { itemId: string; value: ReactionValue | null; reason?: string }) =>
+      value
+        ? api<ShortlistItem>(`/api/trips/${tripId}/shortlist/${itemId}/reaction`, {
+            method: "PUT",
+            body: JSON.stringify({ value, reason: reason || null }),
+          })
+        : api<ShortlistItem>(`/api/trips/${tripId}/shortlist/${itemId}/reaction`, { method: "DELETE" }),
+    onMutate: async ({ itemId, value, reason }) => {
+      await qc.cancelQueries({ queryKey: keys.shortlist(tripId) });
+      const previous = qc.getQueryData<ShortlistItem[]>(keys.shortlist(tripId));
+      qc.setQueryData<ShortlistItem[]>(keys.shortlist(tripId), (old) =>
+        old?.map((item) => {
+          if (item.id !== itemId) return item;
+          const others = item.reactions.filter((r) => r.userId !== me.id);
+          if (!value) return { ...item, reactions: others };
+          const mine = {
+            userId: me.id,
+            displayName: me.displayName,
+            value,
+            reason: reason || null,
+            updatedAt: new Date().toISOString(),
+          };
+          return { ...item, reactions: [...others, mine] };
+        }),
+      );
+      return { previous };
+    },
+    onError: (_e, _v, ctx) => qc.setQueryData(keys.shortlist(tripId), ctx?.previous),
+    onSuccess: (item) => qc.setQueryData<ShortlistItem[]>(keys.shortlist(tripId), (old) => replaceItem(old, item)),
+  });
+}
+
+export function usePlaceSearch(tripId: string, q: string) {
+  const query = q.trim().replace(/\s+/g, " ");
+  return useQuery({
+    queryKey: keys.placeSearch(tripId, query.toLowerCase()),
+    queryFn: () => api<PlaceResults>(`/api/trips/${tripId}/places/search?q=${encodeURIComponent(query)}`),
+    enabled: query.length >= 2,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+}
+
+export function useNearbyPlaces(tripId: string, category: PlaceCategory | null) {
+  return useQuery({
+    queryKey: keys.nearby(tripId, category ?? "OTHER"),
+    queryFn: () => api<PlaceResults>(`/api/trips/${tripId}/places/nearby?category=${category}`),
+    enabled: !!category,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+}
+
+export function useLinkPreview(tripId: string) {
+  return useMutation({
+    mutationFn: (url: string) =>
+      api<LinkPreview>(`/api/trips/${tripId}/link-preview?url=${encodeURIComponent(url)}`),
   });
 }

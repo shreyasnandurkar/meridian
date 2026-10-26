@@ -49,9 +49,18 @@
   --ring: var(--signal);
   --gridline: color-mix(in oklab, var(--contour) 35%, transparent);
 
+  /* ---- place categories (map markers, chips); always paired with an icon and a label */
+  --cat-sights: #2c5d8a;
+  --cat-food: #9a5b0c;
+  --cat-stays: #6b5a22;
+  --cat-activities: var(--kelp);
+  --cat-other: var(--ink-soft);
+  --cat-foreground: #ffffff;
+
   /* ---- shape & depth: crisp like printed charts; shadow only for floating layers */
   --radius: 0.5rem;
   --shadow-float: 0 10px 30px -12px rgb(23 48 74 / 0.28);
+  --overlay: rgb(23 48 74 / 0.4);
 }
 
 .dark {
@@ -77,6 +86,13 @@
   --border: #22374d;
   --input: #2d4660;
   --shadow-float: 0 12px 34px -12px rgb(0 0 0 / 0.6);
+  --overlay: rgb(4 10 18 / 0.7);
+
+  --cat-sights: #8db9e3;
+  --cat-food: var(--buoy);
+  --cat-stays: #d9c78c;
+  --cat-other: var(--ink-soft);
+  --cat-foreground: #0e1a28;
 }
 
 @theme inline {
@@ -106,6 +122,12 @@
   --color-sounding: var(--sounding);
   --color-contour: var(--contour);
   --color-gridline: var(--gridline);
+  --color-cat-sights: var(--cat-sights);
+  --color-cat-food: var(--cat-food);
+  --color-cat-stays: var(--cat-stays);
+  --color-cat-activities: var(--cat-activities);
+  --color-cat-other: var(--cat-other);
+  --color-cat-foreground: var(--cat-foreground);
 
   /* type: one grotesk for everything; italic serif only for place names */
   --font-sans: var(--font-grotesk), ui-sans-serif, system-ui, sans-serif;
@@ -194,6 +216,103 @@
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.01em;
   }
+}
+
+/* ---- MapLibre: chart-room chrome; OSM raster tiles are dimmed and inverted for the night chart */
+.maplibregl-map {
+  font: inherit;
+}
+.dark .maplibregl-canvas {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.88) saturate(0.6);
+}
+.maplibregl-ctrl .maplibregl-ctrl-attrib-inner,
+.maplibregl-ctrl.maplibregl-ctrl-attrib {
+  font-size: var(--text-xs);
+}
+.dark .maplibregl-ctrl-attrib,
+.dark .maplibregl-ctrl-group {
+  background: var(--paper-raised);
+  color: var(--ink-soft);
+}
+.dark .maplibregl-ctrl-attrib a {
+  color: var(--ink);
+}
+.dark .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(1);
+}
+/* (doubled classes: maplibre-gl.css loads after this file) */
+.maplibregl-popup .maplibregl-popup-content {
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+  padding: 0.75rem 1rem;
+  font-size: var(--text-sm);
+}
+.maplibregl-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: var(--popover);
+}
+.maplibregl-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: var(--popover);
+}
+.maplibregl-popup .maplibregl-popup-close-button {
+  color: var(--ink-soft);
+  padding: 0 0.4rem;
+  font-size: 1.1rem;
+}
+
+/* Shortlist marker: a buoy in the category colour, lettered with the adder's initials, with a short stem. */
+.meridian-marker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin-bottom: 6px;
+  border-radius: 9999px;
+  border: 2px solid var(--paper-raised);
+  background: var(--marker, var(--cat-other));
+  color: var(--cat-foreground);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.3);
+  cursor: pointer;
+  /* MapLibre positions markers with an inline transform, so scale with the separate `scale` property */
+  transition: scale 120ms ease;
+}
+.meridian-marker::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  width: 2px;
+  height: 6px;
+  transform: translateX(-50%);
+  background: var(--marker, var(--cat-other));
+}
+.meridian-marker:hover,
+.meridian-marker[aria-pressed="true"] {
+  scale: 1.15;
+  z-index: 2;
+}
+.meridian-marker[aria-pressed="true"] {
+  box-shadow: 0 0 0 3px var(--signal), 0 2px 6px rgb(0 0 0 / 0.3);
+}
+.meridian-marker:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+}
+.meridian-pin {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 9999px;
+  background: var(--signal);
+  border: 3px solid var(--paper-raised);
+  box-shadow: 0 0 0 6px color-mix(in oklab, var(--signal) 25%, transparent), 0 2px 6px rgb(0 0 0 / 0.35);
+  cursor: grab;
 }
 
 @keyframes fade-in {

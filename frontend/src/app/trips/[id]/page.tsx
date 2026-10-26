@@ -21,6 +21,7 @@ import { PageLoading, RequireAuth } from "@/components/require-auth";
 import { MembersTab } from "@/components/trip/members-tab";
 import { OverviewTab } from "@/components/trip/overview-tab";
 import { PlaceholderTab } from "@/components/trip/placeholder-tab";
+import { ShortlistTab } from "@/components/shortlist/shortlist-tab";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiError } from "@/lib/api";
@@ -124,12 +125,7 @@ function TripHub() {
           <MembersTab trip={t} />
         </TabsContent>
         <TabsContent value="shortlist">
-          <PlaceholderTab
-            icon={ListChecks}
-            title="Shared shortlist"
-            body="Add places by search, link or map pin, with who added each one and why."
-            milestone={3}
-          />
+          <ShortlistTab trip={t} />
         </TabsContent>
         <TabsContent value="group-fit">
           <PlaceholderTab

@@ -2,6 +2,7 @@ package com.meridian.geo;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.meridian.common.ApiException;
+import com.meridian.config.MeridianProperties;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,7 +25,6 @@ import org.springframework.web.client.RestClientException;
 public class NominatimGeocodingClient implements GeocodingClient {
 
     private static final Logger log = LoggerFactory.getLogger(NominatimGeocodingClient.class);
-    private static final long MIN_INTERVAL_MS = 1100;
     private static final int CACHE_SIZE = 500;
 
     private final RestClient http;
@@ -35,17 +35,17 @@ public class NominatimGeocodingClient implements GeocodingClient {
                     return size() > CACHE_SIZE;
                 }
             });
-    private final Object throttle = new Object();
-    private long lastCallAt;
+    private final OsmRateLimiter rateLimiter;
 
-    public NominatimGeocodingClient() {
+    public NominatimGeocodingClient(MeridianProperties props, OsmRateLimiter rateLimiter) {
+        this.rateLimiter = rateLimiter;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(4));
         factory.setReadTimeout(Duration.ofSeconds(6));
         this.http = RestClient.builder()
-                .baseUrl("https://nominatim.openstreetmap.org")
+                .baseUrl(props.places().nominatimUrl())
                 .requestFactory(factory)
-                .defaultHeader("User-Agent", "Meridian/0.2 (collaborative trip planner; classroom project)")
+                .defaultHeader("User-Agent", OsmRateLimiter.USER_AGENT)
                 .defaultHeader("Accept-Language", "en")
                 .build();
     }
@@ -58,7 +58,7 @@ public class NominatimGeocodingClient implements GeocodingClient {
 
         JsonNode body;
         try {
-            waitForSlot();
+            rateLimiter.acquire();
             body = http.get()
                     .uri(u -> u.path("/search")
                             .queryParam("q", query.strip())
@@ -89,13 +89,5 @@ public class NominatimGeocodingClient implements GeocodingClient {
         List<GeoResult> immutable = List.copyOf(results);
         cache.put(key, immutable);
         return immutable;
-    }
-
-    private void waitForSlot() throws InterruptedException {
-        synchronized (throttle) {
-            long wait = lastCallAt + MIN_INTERVAL_MS - System.currentTimeMillis();
-            if (wait > 0) Thread.sleep(wait);
-            lastCallAt = System.currentTimeMillis();
-        }
     }
 }

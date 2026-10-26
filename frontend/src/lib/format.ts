@@ -46,3 +46,30 @@ export function formatCoords(lat: number, lng: number): string {
   };
   return `${part(lat, "N", "S")}, ${part(lng, "E", "W")}`;
 }
+
+/** Great-circle distance in kilometres. */
+export function distanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const rad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * rad;
+  const dLng = (lng2 - lng1) * rad;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371.0088 * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+export function formatDistance(km: number): string {
+  if (km < 1) return `${Math.round(km * 1000 / 10) * 10} m`;
+  return `${km < 10 ? km.toFixed(1) : Math.round(km)} km`;
+}
+
+const relativeFmt = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+/** "5 min ago", "yesterday", or a date for anything older than a week. */
+export function formatRelative(iso: string, now = Date.now()): string {
+  const seconds = Math.round((new Date(iso).getTime() - now) / 1000);
+  const abs = Math.abs(seconds);
+  if (abs < 60) return "just now";
+  if (abs < 3600) return relativeFmt.format(Math.round(seconds / 60), "minute");
+  if (abs < 86400) return relativeFmt.format(Math.round(seconds / 3600), "hour");
+  if (abs < 7 * 86400) return relativeFmt.format(Math.round(seconds / 86400), "day");
+  return dateFmt.format(new Date(iso));
+}
