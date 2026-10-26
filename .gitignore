@@ -1,0 +1,26 @@
+# Env
+.env
+.env.local
+
+# Java / Maven
+backend/target/
+*.class
+*.log
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts
+*.tsbuildinfo
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Local-only files
+CLAUDE.md
+docs/DECISIONS.md

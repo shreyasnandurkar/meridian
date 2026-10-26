@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-meridian}
+      POSTGRES_USER: ${POSTGRES_USER:-meridian}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-meridian}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-meridian}
+      DATABASE_USERNAME: ${POSTGRES_USER:-meridian}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-meridian}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-at-least-32-bytes-long}
+      AI_ENABLED: ${AI_ENABLED:-true}
+      # Ollama runs on the host machine, outside compose.
+      AI_BASE_URL: ${AI_BASE_URL_DOCKER:-http://host.docker.internal:11434/v1}
+      AI_API_KEY: ${AI_API_KEY:-ollama}
+      AI_MODEL: ${AI_MODEL:-qwen3:4b-instruct-2507}
+      AI_MAX_CONCURRENCY: ${AI_MAX_CONCURRENCY:-1}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-90}
+      PLACES_PROVIDER: ${PLACES_PROVIDER:-osm}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:

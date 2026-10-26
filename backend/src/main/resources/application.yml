@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: meridian
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/meridian}
+    username: ${DATABASE_USERNAME:meridian}
+    password: ${DATABASE_PASSWORD:meridian}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+meridian:
+  app-base-url: ${APP_BASE_URL:http://localhost:3000}
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-change-me-at-least-32-bytes-long}
+    ttl: PT24H
+  ai:
+    enabled: ${AI_ENABLED:true}
+    base-url: ${AI_BASE_URL:http://localhost:11434/v1}
+    api-key: ${AI_API_KEY:ollama}
+    model: ${AI_MODEL:qwen3:4b-instruct-2507}
+    max-concurrency: ${AI_MAX_CONCURRENCY:1}
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:90}
+  places:
+    provider: ${PLACES_PROVIDER:osm}
