@@ -1,7 +1,7 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-wordmark-dark.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/median_dark.png">
   <img src="docs/assets/logo-wordmark-light.png" alt="Meridian — Plan one trip, together." width="420">
 </picture>
 
