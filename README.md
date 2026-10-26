@@ -14,8 +14,9 @@ suggests places locals actually go, and drafts an itinerary the group votes on b
 ![Spring Boot 3.5](https://img.shields.io/badge/Spring_Boot-3.5-17304a?style=flat-square)
 ![Next.js 15](https://img.shields.io/badge/Next.js-15-17304a?style=flat-square)
 ![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-17304a?style=flat-square)
-![Local AI via Ollama](https://img.shields.io/badge/AI-local_via_Ollama-a8306a?style=flat-square)
-![No paid placement](https://img.shields.io/badge/paid_placement-none-2f6e50?style=flat-square)
+![model: Qwen3:4b](https://img.shields.io/badge/model-Qwen3%3A4b-17304a?style=flat-square)   
+
+
 
 [**Features**](#features) · [**How it works**](#how-it-works) · [**Try it**](#try-it-in-five-minutes) · [**AI that shows its work**](#ai-that-shows-its-work) · [**Architecture**](#architecture)
 
