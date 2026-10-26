@@ -129,7 +129,7 @@ public class RecommendationService {
     /** Re-rank and explain with AI in a background job; falls back to the rule-based set. */
     public AiJob startAi(UUID tripId, UUID userId, RecommendationQuery query) {
         Prepared p = prepare(tripId, userId, query);
-        return jobs.submit(userId, FEATURE, ctx -> {
+        return jobs.submit(userId, tripId, FEATURE, ctx -> {
             ctx.progress(5, "Scored " + p.ranked().size() + " places from OpenStreetMap");
             RecommendationSet set = generate(p, query.regenerate(), ctx::progress);
             ctx.progress(100, "Suggestions ready");

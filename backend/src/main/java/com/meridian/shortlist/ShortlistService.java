@@ -1,6 +1,7 @@
 package com.meridian.shortlist;
 
 import com.meridian.common.ApiException;
+import com.meridian.realtime.TripEvents;
 import com.meridian.itinerary.Comment;
 import com.meridian.itinerary.CommentRepository;
 import com.meridian.itinerary.ItineraryItemRepository;
@@ -52,11 +53,12 @@ public class ShortlistService {
     private final TransactionTemplate tx;
     private final ItineraryItemRepository itineraryItems;
     private final CommentRepository comments;
+    private final TripEvents events;
 
     public ShortlistService(ShortlistItemRepository items, ReactionRepository reactions, PlaceRepository places,
             PlaceService placeService, UserRepository users, TripAccess access, LinkPreviewer previewer,
             PlatformTransactionManager txManager, ItineraryItemRepository itineraryItems,
-            CommentRepository comments) {
+            CommentRepository comments, TripEvents events) {
         this.items = items;
         this.reactions = reactions;
         this.places = places;
@@ -67,6 +69,7 @@ public class ShortlistService {
         this.tx = new TransactionTemplate(txManager);
         this.itineraryItems = itineraryItems;
         this.comments = comments;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -80,7 +83,7 @@ public class ShortlistService {
         TripMember me = access.requireMember(tripId, userId);
         String reason = blankToNull(req.reason());
         String notes = blankToNull(req.notes());
-        return switch (req.kind()) {
+        ItemView added = switch (req.kind()) {
             case PLACE -> {
                 if (req.placeId() == null) throw ApiException.badRequest("Choose a place to add");
                 yield tx.execute(s -> {
@@ -112,6 +115,8 @@ public class ShortlistService {
                         category, userId, reason, notes)), me));
             }
         };
+        events.publish(tripId, TripEvents.Type.SHORTLIST, userId);
+        return added;
     }
 
     @Transactional
@@ -120,6 +125,7 @@ public class ShortlistService {
         ShortlistItem item = requireItem(tripId, itemId);
         requireEditor(item, me);
         item.edit(req.category(), req.title(), req.reason(), req.notes());
+        events.publish(tripId, TripEvents.Type.SHORTLIST, userId);
         return view(item, me);
     }
 
@@ -133,6 +139,7 @@ public class ShortlistService {
         }
         comments.deleteByTripIdAndTargetTypeAndTargetId(tripId, Comment.Target.SHORTLIST_ITEM, itemId);
         items.delete(item);
+        events.publish(tripId, TripEvents.Type.SHORTLIST, userId);
     }
 
     @Transactional
@@ -143,6 +150,7 @@ public class ShortlistService {
                 .orElseGet(() -> new Reaction(itemId, userId));
         reaction.set(req.value(), req.reason());
         reactions.save(reaction);
+        events.publish(tripId, TripEvents.Type.SHORTLIST, userId);
         return view(item, me);
     }
 
@@ -152,6 +160,7 @@ public class ShortlistService {
         ShortlistItem item = requireItem(tripId, itemId);
         reactions.findById(new Reaction.Key(itemId, userId)).ifPresent(reactions::delete);
         reactions.flush();
+        events.publish(tripId, TripEvents.Type.SHORTLIST, userId);
         return view(item, me);
     }
 

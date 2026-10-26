@@ -2,6 +2,7 @@ package com.meridian.trip;
 
 import com.meridian.common.ApiException;
 import com.meridian.config.MeridianProperties;
+import com.meridian.realtime.TripEvents;
 import com.meridian.trip.TripDtos.AcceptResult;
 import com.meridian.trip.TripDtos.InvitePreview;
 import com.meridian.trip.TripDtos.InviteView;
@@ -24,15 +25,17 @@ public class InviteService {
     private final UserRepository users;
     private final TripAccess access;
     private final String appBaseUrl;
+    private final TripEvents events;
 
     public InviteService(InviteRepository invites, TripRepository trips, TripMemberRepository members,
-            UserRepository users, TripAccess access, MeridianProperties props) {
+            UserRepository users, TripAccess access, MeridianProperties props, TripEvents events) {
         this.invites = invites;
         this.trips = trips;
         this.members = members;
         this.users = users;
         this.access = access;
         this.appBaseUrl = props.appBaseUrl().replaceAll("/+$", "");
+        this.events = events;
     }
 
     @Transactional
@@ -74,6 +77,7 @@ public class InviteService {
         TripUserId key = new TripUserId(invite.getTripId(), userId);
         if (members.existsById(key)) return new AcceptResult(invite.getTripId(), true);
         members.save(new TripMember(invite.getTripId(), userId, TripMember.Role.MEMBER));
+        events.publish(invite.getTripId(), TripEvents.Type.MEMBERS, userId);
         return new AcceptResult(invite.getTripId(), false);
     }
 

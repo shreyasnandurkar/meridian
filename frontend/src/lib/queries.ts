@@ -14,6 +14,9 @@ import type {
   TripComment,
   Comparison,
   ComparisonKind,
+  Decision,
+  Gate,
+  VoteValue,
   GroupFit,
   OptionDraft,
   OptionRowInput,
@@ -61,6 +64,9 @@ export const keys = {
   itinerary: (tripId: string) => ["trip", tripId, "itinerary"] as const,
   proposals: (tripId: string) => ["trip", tripId, "proposals"] as const,
   comments: (tripId: string) => ["trip", tripId, "comments"] as const,
+  gate: (tripId: string) => ["trip", tripId, "gate"] as const,
+  decisions: (tripId: string) => ["trip", tripId, "decisions"] as const,
+  aiActivity: (tripId: string) => ["trip", tripId, "ai-activity"] as const,
 };
 
 export function useVocabulary() {
@@ -544,6 +550,169 @@ export function useDeleteComment(tripId: string) {
     onSuccess: (_v, id) => {
       qc.setQueryData<TripComment[]>(keys.comments(tripId), (old) => old?.filter((c) => c.id !== id));
       bumpCommentCounts(qc, tripId);
+    },
+  });
+}
+
+// ---- voting, consensus gate, decision log -------------------------------------------------------------------
+
+/** 404 when the trip has no itinerary yet; callers only enable this once there is one. */
+export function useGate(tripId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: keys.gate(tripId),
+    queryFn: () => api<Gate>(`/api/trips/${tripId}/itinerary/approval`),
+    enabled,
+  });
+}
+
+function afterGateChange(qc: ReturnType<typeof useQueryClient>, tripId: string, gate: Gate) {
+  qc.setQueryData(keys.gate(tripId), gate);
+  qc.invalidateQueries({ queryKey: keys.itinerary(tripId) });
+  qc.invalidateQueries({ queryKey: keys.proposals(tripId) });
+  qc.invalidateQueries({ queryKey: keys.decisions(tripId) });
+}
+
+/** My verdict on the plan as it is now (`null` takes it back), optimistically. */
+export function useVotePlan(tripId: string, me: { id: string }) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (value: VoteValue | null) =>
+      value
+        ? api<Gate>(`/api/trips/${tripId}/itinerary/approval`, { method: "PUT", body: JSON.stringify({ value }) })
+        : api<Gate>(`/api/trips/${tripId}/itinerary/approval`, { method: "DELETE" }),
+    onMutate: async (value) => {
+      await qc.cancelQueries({ queryKey: keys.gate(tripId) });
+      const previous = qc.getQueryData<Gate>(keys.gate(tripId));
+      if (previous) qc.setQueryData(keys.gate(tripId), optimisticGate(previous, me.id, value));
+      return { previous };
+    },
+    onError: (_e, _v, ctx) => qc.setQueryData(keys.gate(tripId), ctx?.previous),
+    onSuccess: (gate) => qc.setQueryData(keys.gate(tripId), gate),
+  });
+}
+
+function optimisticGate(g: Gate, userId: string, value: VoteValue | null): Gate {
+  const before = g.voters.find((v) => v.userId === userId)?.value ?? null;
+  const count = (v: VoteValue) => (before === v ? -1 : 0) + (value === v ? 1 : 0);
+  const tally = {
+    ...g.tally,
+    approvals: g.tally.approvals + count("APPROVE"),
+    rejections: g.tally.rejections + count("REJECT"),
+  };
+  const voters = g.voters.map((v) => (v.userId === userId ? { ...v, value, at: new Date().toISOString() } : v));
+  return {
+    ...g,
+    myVote: value,
+    tally,
+    quorumMet: tally.approvals >= tally.required,
+    voters,
+    notVoted: voters.filter((v) => v.value === null).map((v) => ({ userId: v.userId, displayName: v.displayName })),
+  };
+}
+
+export function useLockItinerary(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (reason: string | null) =>
+      api<Gate>(`/api/trips/${tripId}/itinerary/lock`, { method: "POST", body: JSON.stringify({ reason }) }),
+    onSuccess: (gate) => afterGateChange(qc, tripId, gate),
+  });
+}
+
+export function useUnlockItinerary(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (reason: string | null) =>
+      api<Gate>(`/api/trips/${tripId}/itinerary/unlock`, { method: "POST", body: JSON.stringify({ reason }) }),
+    onSuccess: (gate) => afterGateChange(qc, tripId, gate),
+  });
+}
+
+/** Approve or reject a proposal (`null` takes the vote back), optimistically. */
+export function useVote(tripId: string, me: { id: string; displayName: string }) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ proposalId, value }: { proposalId: string; value: VoteValue | null }) =>
+      value
+        ? api<Proposal>(`/api/trips/${tripId}/proposals/${proposalId}/vote`, {
+            method: "PUT",
+            body: JSON.stringify({ value }),
+          })
+        : api<Proposal>(`/api/trips/${tripId}/proposals/${proposalId}/vote`, { method: "DELETE" }),
+    onMutate: async ({ proposalId, value }) => {
+      await qc.cancelQueries({ queryKey: keys.proposals(tripId) });
+      const previous = qc.getQueryData<Proposal[]>(keys.proposals(tripId));
+      qc.setQueryData<Proposal[]>(keys.proposals(tripId), (old) =>
+        old?.map((p) => (p.id === proposalId ? optimisticVote(p, me, value) : p)),
+      );
+      return { previous };
+    },
+    onError: (_e, _v, ctx) => qc.setQueryData(keys.proposals(tripId), ctx?.previous),
+    onSuccess: (p) => {
+      qc.setQueryData<Proposal[]>(keys.proposals(tripId), (old) => old?.map((x) => (x.id === p.id ? p : x)));
+      if (p.status !== "OPEN") {
+        qc.invalidateQueries({ queryKey: keys.itinerary(tripId) });
+        qc.invalidateQueries({ queryKey: keys.gate(tripId) });
+        qc.invalidateQueries({ queryKey: keys.decisions(tripId) });
+      }
+    },
+  });
+}
+
+function optimisticVote(p: Proposal, me: { id: string; displayName: string }, value: VoteValue | null): Proposal {
+  const others = p.votes.filter((v) => v.voter.userId !== me.id);
+  const votes = value
+    ? [...others, { voter: { userId: me.id, displayName: me.displayName }, value, at: new Date().toISOString() }]
+    : others;
+  const approvals = votes.filter((v) => v.value === "APPROVE").length;
+  const notVoted = value
+    ? p.notVoted.filter((n) => n.userId !== me.id)
+    : p.notVoted.some((n) => n.userId === me.id)
+      ? p.notVoted
+      : [...p.notVoted, { userId: me.id, displayName: me.displayName }];
+  return {
+    ...p,
+    votes,
+    myVote: value,
+    notVoted,
+    tally: { ...p.tally, approvals, rejections: votes.length - approvals },
+  };
+}
+
+export function useDecisions(tripId: string) {
+  return useQuery({
+    queryKey: keys.decisions(tripId),
+    queryFn: () => api<Decision[]>(`/api/trips/${tripId}/decisions`),
+  });
+}
+
+/** A6 again for one entry; the list refreshes from live events when the job finishes. */
+export function useSummarizeDecision(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<AiJob>(`/api/trips/${tripId}/decisions/${id}/summary`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.decisions(tripId) }),
+  });
+}
+
+export function useDismissDecisionSummary(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<Decision>(`/api/trips/${tripId}/decisions/${id}/summary/dismiss`, { method: "POST" }),
+    onSuccess: (d) => qc.setQueryData<Decision[]>(keys.decisions(tripId), (old) => old?.map((x) => (x.id === d.id ? d : x))),
+  });
+}
+
+export function useUpdateQuorum(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (minApprovals: number | null) =>
+      api<TripDetail>(`/api/trips/${tripId}/quorum`, { method: "PUT", body: JSON.stringify({ minApprovals }) }),
+    onSuccess: (trip) => {
+      qc.setQueryData(keys.trip(tripId), trip);
+      qc.invalidateQueries({ queryKey: keys.proposals(tripId) });
+      qc.invalidateQueries({ queryKey: keys.gate(tripId) });
     },
   });
 }

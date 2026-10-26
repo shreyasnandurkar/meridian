@@ -16,7 +16,8 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "proposals")
 public class Proposal {
 
-    public enum Status { OPEN, WITHDRAWN, APPROVED, REJECTED, STALE }
+    /** {@code CLOSED}: the itinerary was locked before the vote finished. */
+    public enum Status { OPEN, WITHDRAWN, APPROVED, REJECTED, STALE, CLOSED }
 
     @Id
     private UUID id;

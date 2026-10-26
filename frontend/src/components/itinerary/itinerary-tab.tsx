@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarRange, GitPullRequestArrow, Plus, Route, Sparkles } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { CalendarRange, GitPullRequestArrow, Loader2, Plus, Route, Sparkles } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { ConsensusGate } from "@/components/decisions/consensus-gate";
 import { ErrorState } from "@/components/error-state";
 import { DayTimeline, formatDay } from "@/components/itinerary/day-timeline";
 import { ProposalsPanel } from "@/components/itinerary/proposals-panel";
@@ -22,7 +23,8 @@ import {
   useItinerary,
   useRegenerateDay,
 } from "@/lib/queries";
-import type { Itinerary, Pace, TripDetail, UnplacedItem } from "@/lib/types";
+import { useAuth } from "@/lib/auth";
+import type { AiActivity, Itinerary, Pace, TripDetail, UnplacedItem } from "@/lib/types";
 import { useAiRun } from "@/lib/use-ai-run";
 import { cn } from "@/lib/utils";
 
@@ -79,7 +81,7 @@ export function ItineraryTab({ trip }: { trip: TripDetail }) {
   const busy = run.running || generate.isPending;
   const jobError = run.error ?? generate.error?.message ?? regenerateDay.error?.message;
 
-  const controls = isOrganizer && (
+  const controls = isOrganizer && it?.status !== "LOCKED" && (
     <div className="flex flex-wrap items-end gap-2">
       <div className="space-y-1">
         <label htmlFor="itinerary-pace" className="text-muted-foreground block text-xs">
@@ -134,6 +136,7 @@ export function ItineraryTab({ trip }: { trip: TripDetail }) {
           </div>
           {controls}
           {progress}
+          {!run.running && <OthersAiActivity tripId={trip.id} />}
         </div>
       </div>
     );
@@ -169,6 +172,8 @@ export function ItineraryTab({ trip }: { trip: TripDetail }) {
       </div>
 
       {progress}
+      {!run.running && <OthersAiActivity tripId={trip.id} />}
+      <ConsensusGate tripId={trip.id} isOrganizer={isOrganizer} />
       {edit.error && (
         <p role="alert" className="text-destructive text-sm">
           {edit.error.message}
@@ -218,6 +223,27 @@ export function ItineraryTab({ trip }: { trip: TripDetail }) {
         onOpenChange={(open) => !open && setProposing(null)}
       />
     </div>
+  );
+}
+
+/** Someone else's AI job on this trip (from live events), e.g. the organizer regenerating the draft. */
+function OthersAiActivity({ tripId }: { tripId: string }) {
+  const { user } = useAuth();
+  const activity = useQuery<Record<string, AiActivity>>({
+    queryKey: keys.aiActivity(tripId),
+    queryFn: () => ({}),
+    staleTime: Infinity,
+    enabled: false,
+  }).data;
+  const running = Object.values(activity ?? {}).find(
+    (a) => a.feature === "itinerary" && a.ownerId !== user?.id && (a.status === "RUNNING" || a.status === "QUEUED"),
+  );
+  if (!running) return null;
+  return (
+    <p role="status" className="text-muted-foreground inline-flex items-center gap-2 text-sm">
+      <Loader2 className="text-signal size-4 animate-spin" aria-hidden />
+      The organizer is updating the plan: {running.message} ({running.percent}%)
+    </p>
   );
 }
 

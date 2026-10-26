@@ -2,6 +2,7 @@ package com.meridian.trip;
 
 import com.meridian.common.ApiException;
 import com.meridian.profile.TravelerProfileEntity;
+import com.meridian.realtime.TripEvents;
 import com.meridian.profile.TravelerProfileRepository;
 import com.meridian.trip.TripDtos.CreateTripRequest;
 import com.meridian.trip.TripDtos.MemberView;
@@ -34,15 +35,17 @@ public class TripService {
     private final UserRepository users;
     private final TravelerProfileRepository profiles;
     private final TripAccess access;
+    private final TripEvents events;
 
     public TripService(TripRepository trips, TripMemberRepository members, TripPreferenceRepository preferences,
-            UserRepository users, TravelerProfileRepository profiles, TripAccess access) {
+            UserRepository users, TravelerProfileRepository profiles, TripAccess access, TripEvents events) {
         this.trips = trips;
         this.members = members;
         this.preferences = preferences;
         this.users = users;
         this.profiles = profiles;
         this.access = access;
+        this.events = events;
     }
 
     @Transactional
@@ -111,7 +114,22 @@ public class TripService {
         List<String> mustHaves = req.mustHaves() == null ? List.of()
                 : req.mustHaves().stream().map(String::strip).distinct().toList();
         pref.update(req.budgetMin(), req.budgetMax(), mustHaves, req.budgetVisible());
+        events.publish(tripId, TripEvents.Type.MEMBERS, userId);
         return view(preferences.save(pref), trip);
+    }
+
+    /**
+     * Organizer only: how many approvals a vote needs. {@code null} means a simple majority; a number is clamped to
+     * the group size when it is counted. Open votes are settled by the caller under the new rule.
+     */
+    @Transactional
+    public TripDetail updateQuorum(UUID tripId, UUID userId, Integer minApprovals) {
+        TripMember me = access.requireOrganizer(tripId, userId);
+        if (minApprovals != null && minApprovals < 1) throw ApiException.badRequest("At least 1 approval is needed");
+        Trip trip = trips.findById(tripId).orElseThrow();
+        trip.setQuorumMinApprovals(minApprovals);
+        events.publish(tripId, TripEvents.Type.TRIP, userId);
+        return detail(trip, me.getRole());
     }
 
     private static PreferenceView view(TripPreference p, Trip trip) {

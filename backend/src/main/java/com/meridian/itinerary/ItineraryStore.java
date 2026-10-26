@@ -125,7 +125,7 @@ public class ItineraryStore {
             }
             saveSlots(itinerary.getId(), day.getId(), Scheduler.schedule(order, keep, itinerary.getPace()).slots(),
                     notes);
-            day.editedByHand(handNote);
+            day.editedByHand(handNote, DayPlanner.templateSummary(order));
         }
         List<Itinerary.Unplaced> unplaced = new ArrayList<>(itinerary.getUnplaced().stream()
                 .filter(u -> !u.shortlistItemId().equals(edit.itemId())).toList());
@@ -134,6 +134,15 @@ public class ItineraryStore {
         }
         itinerary.setUnplaced(unplaced);
         itinerary.changed();
+    }
+
+    /** What stops {@code edit} from applying to the plan as it is now; empty when it can be applied. */
+    @Transactional(readOnly = true)
+    public List<String> check(UUID tripId, PlanEdit edit) {
+        Itinerary itinerary = require(tripId);
+        Layout layout = layoutOf(days.findByItineraryIdOrderByDayIndex(itinerary.getId()),
+                items.findByItineraryIdOrderByPosition(itinerary.getId()));
+        return layout.check(edit, stopFactory.load(tripId, false).stops().keySet());
     }
 
     /** Each stop's predecessor on its day; the first stop of a day maps to a fixed marker. */
@@ -171,7 +180,7 @@ public class ItineraryStore {
                 .orElseThrow(() -> ApiException.notFound("This trip has no itinerary yet"));
     }
 
-    static void requireDraft(Itinerary itinerary) {
+    public static void requireDraft(Itinerary itinerary) {
         if (itinerary.isLocked()) throw ApiException.conflict("The itinerary is locked; unlock it to make changes");
     }
 }

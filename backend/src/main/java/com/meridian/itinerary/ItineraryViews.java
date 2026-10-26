@@ -1,5 +1,7 @@
 package com.meridian.itinerary;
 
+import com.meridian.decision.DecisionEntry;
+import com.meridian.decision.DecisionRepository;
 import com.meridian.itinerary.ItineraryDtos.DayView;
 import com.meridian.itinerary.ItineraryDtos.ItineraryView;
 import com.meridian.itinerary.ItineraryDtos.StopView;
@@ -44,10 +46,11 @@ public class ItineraryViews {
     private final TripMemberRepository members;
     private final UserRepository users;
     private final DayPlanner planner;
+    private final DecisionRepository decisions;
 
     public ItineraryViews(ItineraryRepository itineraries, ItineraryDayRepository days, ItineraryItemRepository items,
             ProposalRepository proposals, CommentRepository comments, StopFactory stopFactory,
-            TripMemberRepository members, UserRepository users, DayPlanner planner) {
+            TripMemberRepository members, UserRepository users, DayPlanner planner, DecisionRepository decisions) {
         this.itineraries = itineraries;
         this.days = days;
         this.items = items;
@@ -57,6 +60,7 @@ public class ItineraryViews {
         this.members = members;
         this.users = users;
         this.planner = planner;
+        this.decisions = decisions;
     }
 
     @Transactional(readOnly = true)
@@ -69,8 +73,14 @@ public class ItineraryViews {
         Map<UUID, Long> commentCounts = comments.findByTripIdOrderByCreatedAt(tripId).stream()
                 .filter(c -> c.getTargetType() == Comment.Target.SHORTLIST_ITEM)
                 .collect(Collectors.groupingBy(Comment::getTargetId, Collectors.counting()));
+        // newest first, so each stop links to the latest decision about it
+        Map<UUID, UUID> decisionOf = new HashMap<>();
+        for (DecisionEntry d : decisions.findByTripIdOrderBySeqDesc(tripId)) {
+            d.getItemIds().forEach(id -> decisionOf.putIfAbsent(id, d.getId()));
+        }
         Set<UUID> people = new HashSet<>();
         people.add(itinerary.getGeneratedBy());
+        if (itinerary.getLockedBy() != null) people.add(itinerary.getLockedBy());
         stops.items().values().forEach(i -> people.add(i.getAddedBy()));
         Map<UUID, String> names = users.findAllById(people).stream()
                 .collect(Collectors.toMap(User::getId, User::getDisplayName));
@@ -94,7 +104,7 @@ public class ItineraryViews {
                         stop == null ? null : stop.lat(), stop == null ? null : stop.lng(),
                         it.getStartTime().toString(), end.toString(), it.getDurationMin(), it.getTravelMin(),
                         it.getTravelKm(), it.getNote(), person.apply(si.getAddedBy()), si.getReason(),
-                        commentCounts.getOrDefault(si.getId(), 0L).intValue()));
+                        commentCounts.getOrDefault(si.getId(), 0L).intValue(), decisionOf.get(si.getId())));
             }
             int overflow = lastEnd == null ? 0
                     : Math.max(0, Scheduler.minutes(lastEnd) - Scheduler.minutes(pace.dayEnd()));
@@ -121,6 +131,7 @@ public class ItineraryViews {
         return Optional.of(new ItineraryView(itinerary.getId(), itinerary.getStatus(), itinerary.getVersion(), pace,
                 groupPace, itinerary.getGeneratedAt(), person.apply(itinerary.getGeneratedBy()),
                 itinerary.getUpdatedAt(), dayViews, unplaced, open, organizer && !itinerary.isLocked(),
-                planner.aiEnabled()));
+                planner.aiEnabled(), itinerary.getLockedAt(),
+                itinerary.getLockedBy() == null ? null : person.apply(itinerary.getLockedBy())));
     }
 }

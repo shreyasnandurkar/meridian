@@ -6,6 +6,7 @@ import com.meridian.common.ApiException;
 import com.meridian.fit.TripGroupLoader;
 import com.meridian.itinerary.ItineraryDtos.GenerateRequest;
 import com.meridian.itinerary.ItineraryDtos.ItineraryView;
+import com.meridian.realtime.TripEvents;
 import com.meridian.trip.Trip;
 import com.meridian.trip.TripAccess;
 import com.meridian.user.User;
@@ -37,11 +38,12 @@ public class ItineraryService {
     private final ItineraryItemRepository items;
     private final UserRepository users;
     private final AiJobService jobs;
+    private final TripEvents events;
 
     public ItineraryService(TripAccess access, TripGroupLoader loader, StopFactory stopFactory,
             ItineraryGenerator generator, DayPlanner planner, ItineraryStore store, ItineraryViews views,
             ItineraryRepository itineraries, ItineraryDayRepository days, ItineraryItemRepository items,
-            UserRepository users, AiJobService jobs) {
+            UserRepository users, AiJobService jobs, TripEvents events) {
         this.access = access;
         this.loader = loader;
         this.stopFactory = stopFactory;
@@ -54,6 +56,7 @@ public class ItineraryService {
         this.items = items;
         this.users = users;
         this.jobs = jobs;
+        this.events = events;
     }
 
     public Optional<ItineraryView> get(UUID tripId, UUID userId) {
@@ -73,10 +76,13 @@ public class ItineraryService {
             throw ApiException.badRequest("Shortlist a few places with a location first; links without one and "
                     + "stays can't be scheduled.");
         }
-        return jobs.submit(userId, FEATURE, ctx -> {
+        return jobs.submit(userId, tripId, FEATURE, ctx -> {
             ItineraryGenerator.Draft draft = generator.generate(trip, pace, stops, false, ctx);
             ctx.progress(97, "Saving the draft");
             store.saveDraft(tripId, userId, draft);
+            events.publish(tripId, TripEvents.Type.ITINERARY, userId);
+            events.publish(tripId, TripEvents.Type.PROPOSALS, userId);
+            events.publish(tripId, TripEvents.Type.APPROVAL, userId);
             ctx.progress(100, "Draft itinerary ready");
             return views.build(tripId, userId, groupPace(group)).orElseThrow();
         });
@@ -98,10 +104,12 @@ public class ItineraryService {
         double[] from = ItineraryGenerator.origin(group.trip(), stops);
         DayPlanner.DayContext ctx = new DayPlanner.DayContext(dayIndex, ItineraryGenerator.dayCount(group.trip()),
                 day.getDate(), itinerary.getPace(), from[0], from[1]);
-        return jobs.submit(userId, FEATURE, job -> {
+        return jobs.submit(userId, tripId, FEATURE, job -> {
             job.progress(10, (planner.aiEnabled() ? "Re-planning" : "Re-ordering") + " day " + dayIndex);
             DayPlanner.PlannedDay plan = planner.plan(ctx, dayStops, true);
             store.saveDay(tripId, dayIndex, plan);
+            events.publish(tripId, TripEvents.Type.ITINERARY, userId);
+            events.publish(tripId, TripEvents.Type.APPROVAL, userId);
             job.progress(100, "Day " + dayIndex + " re-planned");
             return views.build(tripId, userId, groupPace(group)).orElseThrow();
         });
@@ -112,6 +120,9 @@ public class ItineraryService {
         access.requireOrganizer(tripId, userId);
         String name = users.findById(userId).map(User::getDisplayName).orElse("The organizer");
         store.applyEdit(tripId, edit, "Changed by " + name + "; code recomputed the times.");
+        events.publish(tripId, TripEvents.Type.ITINERARY, userId);
+        events.publish(tripId, TripEvents.Type.APPROVAL, userId);
+        events.publish(tripId, TripEvents.Type.PROPOSALS, userId);
         return views.build(tripId, userId, groupPace(tripId)).orElseThrow();
     }
 

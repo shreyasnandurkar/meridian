@@ -2,6 +2,8 @@ package com.meridian.trip;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -56,6 +58,8 @@ public final class TripDtos {
             TripMember.Role myRole,
             List<MemberView> members,
             Instant createdAt) {}
+
+    public record QuorumRequest(@Min(1) @Max(50) Integer minApprovals) {}
 
     public record InviteView(UUID id, String token, String url, Instant createdAt) {}
 

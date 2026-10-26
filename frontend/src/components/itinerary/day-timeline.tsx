@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
   Car,
+  ClipboardList,
   Footprints,
   GitPullRequestArrow,
   MessageSquare,
@@ -178,6 +180,16 @@ export function DayTimeline({
                           ? `${stop.commentCount} comment${stop.commentCount === 1 ? "" : "s"}`
                           : "Comment"}
                       </Button>
+                      {stop.decisionId && (
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
+                          <Link
+                            href={`?tab=decisions#decision-${stop.decisionId}`}
+                            aria-label={`Decision log entry for ${stop.title}`}
+                          >
+                            <ClipboardList aria-hidden /> Decision
+                          </Link>
+                        </Button>
+                      )}
                       {canEdit ? (
                         <StopEditControls
                           stop={stop}

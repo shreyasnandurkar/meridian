@@ -11,7 +11,7 @@ Meridian uses a small local model (Ollama, OpenAI-compatible API) only where rea
 - **Small-model hygiene:** `<think>` blocks and markdown fences are stripped before parsing, in case a model emits them despite the schema. Prompts use temperature 0.2–0.4 and few-shot examples, and stay under 4k tokens of context.
 - **Concurrency:** a fair semaphore caps model calls to `AI_MAX_CONCURRENCY` (default 1). Each call has a timeout of `AI_TIMEOUT_SECONDS`.
 - **Logging:** every attempt writes a row to `ai_call_log` (feature, prompt version, model, input hash, attempt, status `VALID|INVALID|TIMEOUT|ERROR`, prompt and completion tokens, latency, error).
-- **Async jobs:** `AiJobService` runs AI work on virtual threads and tracks status, percent and message per job in memory (one-hour retention). Jobs can be cancelled, which interrupts the in-flight HTTP call. The UI polls `GET /api/ai/jobs/{id}` (WebSocket push arrives in Milestone 6).
+- **Async jobs:** `AiJobService` runs AI work on virtual threads and tracks status, percent and message per job in memory (one-hour retention). Jobs can be cancelled, which interrupts the in-flight HTTP call. The owner's UI polls `GET /api/ai/jobs/{id}` for the result; trip-scoped jobs also publish every progress step to the trip's WebSocket topic, so the whole group sees the AI working.
 - **Result cache:** `ai_cache` stores validated results by `sha256(feature | prompt version | model | canonical input JSON)`. The same input never calls the model twice.
 - **Prompts** live in `backend/src/main/resources/prompts/*.md`. Each file has front matter (`version`, `temperature`) and `## system|user|assistant` sections; `{{placeholders}}` are filled at render time, and an unknown placeholder is an error.
 
@@ -116,6 +116,27 @@ Code does almost all of the work. The model only orders one day and suggests tim
 With `AI_ENABLED=false`, or after a timeout or invalid output, the rule plan is used with template summaries. Days, travel times and repairs are identical.
 
 Found in the live check (qwen3 4B): the model asked for "evening photos" at an 11:15 stop, and it put a seafood dinner place at 09:30 on a day of its own. Both are now repaired by code, as described in step 6.
+
+## Voting and the consensus gate (no AI)
+
+Everything about a decision is code; the model only writes the log sentence afterwards (A6).
+
+- **One vote per member, equal weight.** A vote can be changed or taken back while the proposal is open. Proposing a change counts as the proposer's approval.
+- **Quorum.** Simple majority (`n/2 + 1`) unless the organizer sets a number of approvals, clamped to the group size.
+- **Outcome as soon as it is certain.** Approved when approvals reach the quorum; rejected when so many members rejected that the rest can no longer reach it. An approved change is applied by code at once (same re-timing as an organizer edit). All of this runs under a row lock on the itinerary, so two last votes arriving together can't apply a change twice.
+- **The gate.** Members approve the plan as it is now (`plan_approvals`, tied to the itinerary version). Any change makes earlier verdicts out of date, except that a change approved by vote carries forward the plan approval of members who voted for it. "Lock itinerary" is enabled only when the current version has quorum approval; the organizer can lock without it only by giving a reason, which is logged as an override. Locking closes open proposals.
+- **Live.** Every change is published after commit to `/topic/trips/{id}` over STOMP, so the other windows refetch what changed; AI-job progress is published on the same topic.
+
+## A6 — Decision summary
+
+When a vote closes (a change approved or rejected) or the plan is locked, code appends an entry to `decision_log` with the alternatives, the votes as they stood, who had not voted, the counts and the reason, plus a **template summary** ("Chose to move X over keeping the plan as it was: 3 of 4 approved (3 needed). Voted against: Kabir."). The log is append-only: a database trigger rejects deletes and any update except to the summary columns.
+
+After the commit an AI job (`decision-summary-v1`, temperature 0.2, two few-shot examples) gets the entry as fact lines: decision, change, alternatives, proposer and reason, quorum, `approved (3 of 4): …`, `rejected (1 of 4): …`, `did not vote: …`, and up to four comments from the proposal's discussion. It returns `{summary}` (≤ 280 characters).
+
+- The summary must state the count exactly as given ("3 of 4" or "3/4"), and **any number not in the facts is rejected**; invalid output is retried at most twice, then the template stays.
+- Each person appears once with their vote in the facts, so the model has nothing to mix up (the A3 lesson).
+- Results are cached by facts hash. Any member can regenerate (skips the cache) or dismiss (puts the template back); the entry shows an AI or Rules badge and a "Why?" popover. Unlock entries are template-only.
+- With `AI_ENABLED=false` the template summary is the entry; nothing else changes.
 
 ## Benchmark
 

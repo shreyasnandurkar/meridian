@@ -7,8 +7,9 @@ import { MemberList } from "@/components/trip/member-list";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
-import { useCreateInvite, useInvites, useRevokeInvite } from "@/lib/queries";
+import { useCreateInvite, useInvites, useRevokeInvite, useUpdateQuorum } from "@/lib/queries";
 import type { Invite, TripDetail } from "@/lib/types";
 
 export function MembersTab({ trip }: { trip: TripDetail }) {
@@ -21,8 +22,9 @@ export function MembersTab({ trip }: { trip: TripDetail }) {
           <CardTitle>Members</CardTitle>
           <CardDescription>Everyone gets an equal vote. {trip.quorum.description}.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
           <MemberList members={trip.members} currentUserId={user?.id} />
+          {isOrganizer && <QuorumSetting trip={trip} />}
         </CardContent>
       </Card>
       {isOrganizer ? (
@@ -34,6 +36,45 @@ export function MembersTab({ trip }: { trip: TripDetail }) {
             <CardDescription>Ask the organizer to share the trip&apos;s invite link.</CardDescription>
           </CardHeader>
         </Card>
+      )}
+    </div>
+  );
+}
+
+/** Organizer: how many approvals a vote needs. Open votes are settled under the new rule right away. */
+function QuorumSetting({ trip }: { trip: TripDetail }) {
+  const update = useUpdateQuorum(trip.id);
+  const n = trip.members.length;
+  const value = trip.quorum.minApprovals == null ? "" : String(Math.min(trip.quorum.minApprovals, n));
+  return (
+    <div className="border-t pt-4">
+      <label htmlFor="quorum" className="text-sm font-medium">
+        Approvals a vote needs
+      </label>
+      <p className="text-muted-foreground mt-0.5 text-xs">
+        Applies to proposed changes and to locking the itinerary.
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <NativeSelect
+          id="quorum"
+          className="h-9 w-auto"
+          value={value}
+          disabled={update.isPending}
+          onChange={(e) => update.mutate(e.target.value === "" ? null : Number(e.target.value))}
+        >
+          <option value="">Majority ({Math.floor(n / 2) + 1} of {n})</option>
+          {Array.from({ length: n }, (_, i) => i + 1).map((k) => (
+            <option key={k} value={k}>
+              {k === n ? `Everyone (${k} of ${n})` : `${k} of ${n}`}
+            </option>
+          ))}
+        </NativeSelect>
+        {update.isPending && <Loader2 className="text-muted-foreground size-4 animate-spin" aria-hidden />}
+      </div>
+      {update.error && (
+        <p role="alert" className="text-destructive mt-1 text-xs">
+          {update.error.message}
+        </p>
       )}
     </div>
   );

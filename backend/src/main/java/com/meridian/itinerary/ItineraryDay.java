@@ -9,6 +9,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -65,14 +66,19 @@ public class ItineraryDay {
         this.repairs = List.copyOf(repairs);
     }
 
-    /** Someone changed the stops by hand; the times were recomputed by code. */
-    public void editedByHand(String note) {
-        if (!repairs.contains(note)) {
-            List<String> next = new ArrayList<>(repairs);
-            next.add(note);
-            this.repairs = List.copyOf(next);
-        }
+    /**
+     * Someone changed the stops by hand; the times were recomputed by code. The old summary may name a stop that is
+     * gone, so it is replaced by one written from the new stops.
+     */
+    public void editedByHand(String note, String newSummary) {
+        List<String> next = new ArrayList<>(repairs);
+        if (!next.contains(note)) next.add(note);
+        if (!Objects.equals(summary, newSummary) && !next.contains(SUMMARY_REWRITTEN)) next.add(SUMMARY_REWRITTEN);
+        this.repairs = List.copyOf(next);
+        this.summary = newSummary;
     }
+
+    static final String SUMMARY_REWRITTEN = "Rewrote the summary from the new stops after the change.";
 
     public UUID getId() {
         return id;

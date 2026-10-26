@@ -23,13 +23,14 @@ import { ItineraryTab } from "@/components/itinerary/itinerary-tab";
 import { PageLoading, RequireAuth } from "@/components/require-auth";
 import { MembersTab } from "@/components/trip/members-tab";
 import { OverviewTab } from "@/components/trip/overview-tab";
-import { PlaceholderTab } from "@/components/trip/placeholder-tab";
+import { DecisionsTab } from "@/components/decisions/decisions-tab";
 import { ShortlistTab } from "@/components/shortlist/shortlist-tab";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiError } from "@/lib/api";
 import { formatCoords, formatDateRange } from "@/lib/format";
 import { useTrip } from "@/lib/queries";
+import { useTripEvents, type LiveStatus } from "@/lib/realtime";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -42,6 +43,26 @@ const TABS = [
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
+
+const LIVE: Record<LiveStatus, { label: string; dot: string; title: string }> = {
+  live: { label: "Live", dot: "bg-success", title: "Votes and changes from others appear as they happen" },
+  connecting: { label: "Connecting…", dot: "bg-muted-foreground animate-pulse", title: "Connecting for live updates" },
+  offline: {
+    label: "Reconnecting…",
+    dot: "bg-warning animate-pulse",
+    title: "Live updates paused; the page still refreshes after your own changes",
+  },
+};
+
+function LiveBadge({ status }: { status: LiveStatus }) {
+  const s = LIVE[status];
+  return (
+    <span className="inline-flex items-center gap-1.5" title={s.title} role="status">
+      <span className={`size-2 rounded-full ${s.dot}`} aria-hidden />
+      {s.label}
+    </span>
+  );
+}
 
 export default function TripHubPage() {
   return (
@@ -60,6 +81,7 @@ function TripHub() {
   const requested = useSearchParams().get("tab");
   const tab: TabId = TABS.some((t) => t.id === requested) ? (requested as TabId) : "overview";
   const trip = useTrip(id);
+  const live = useTripEvents(id);
 
   if (trip.isPending) return <PageLoading label="Loading trip…" />;
   if (trip.isError) {
@@ -106,6 +128,7 @@ function TripHub() {
             <Users className="size-4" aria-hidden /> {t.members.length}{" "}
             {t.members.length === 1 ? "member" : "members"}
           </span>
+          <LiveBadge status={live} />
         </div>
       </header>
 
@@ -140,12 +163,7 @@ function TripHub() {
           <ItineraryTab trip={t} />
         </TabsContent>
         <TabsContent value="decisions">
-          <PlaceholderTab
-            icon={ClipboardList}
-            title="Decision log"
-            body="Every group decision with its votes, alternatives and a plain-language summary."
-            milestone={6}
-          />
+          <DecisionsTab trip={t} />
         </TabsContent>
       </Tabs>
     </div>

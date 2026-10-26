@@ -52,6 +52,12 @@ public class Itinerary {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "locked_at")
+    private Instant lockedAt;
+
+    @Column(name = "locked_by")
+    private UUID lockedBy;
+
     protected Itinerary() {}
 
     public Itinerary(UUID tripId, Pace pace, UUID generatedBy) {
@@ -82,6 +88,19 @@ public class Itinerary {
     public void changed() {
         this.version++;
         this.updatedAt = Instant.now();
+    }
+
+    /** Locking freezes the plan; it does not change it, so the version stays. */
+    public void lock(UUID by) {
+        this.status = Status.LOCKED;
+        this.lockedAt = Instant.now();
+        this.lockedBy = by;
+    }
+
+    public void unlock() {
+        this.status = Status.DRAFT;
+        this.lockedAt = null;
+        this.lockedBy = null;
     }
 
     public boolean isLocked() {
@@ -122,5 +141,13 @@ public class Itinerary {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public Instant getLockedAt() {
+        return lockedAt;
+    }
+
+    public UUID getLockedBy() {
+        return lockedBy;
     }
 }

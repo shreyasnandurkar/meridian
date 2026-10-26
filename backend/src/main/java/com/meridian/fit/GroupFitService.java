@@ -92,7 +92,7 @@ public class GroupFitService {
         access.requireMember(tripId, userId);
         TripGroup group = loader.load(tripId);
         List<Row> rows = GroupFitCalculator.rows(group.members(), userId, group.trip().getCurrency());
-        return jobs.submit(userId, TradeoffWriter.FEATURE, ctx -> {
+        return jobs.submit(userId, tripId, TradeoffWriter.FEATURE, ctx -> {
             ctx.progress(10, "Comparing everyone's preferences");
             var summary = writer.generate(rows, regenerate, ctx::progress);
             ctx.progress(100, "Trade-offs ready");

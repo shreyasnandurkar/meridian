@@ -32,7 +32,7 @@ const TYPE_LABELS: Record<PlanEditType, string> = {
   ADD: "Add it to a day",
 };
 
-/** Members propose edits; the organizer applies them directly. Votes on proposals arrive in M6. */
+/** Members propose edits, which the group votes on; the organizer applies them directly. */
 export function ProposeDialog({
   tripId,
   itinerary,

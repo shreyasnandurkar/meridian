@@ -133,6 +133,11 @@ class ItineraryIntegrationTest extends IntegrationTestBase {
         assertThat(dayOf(after, "Chapora Fort")).isEqualTo(to);
         assertThat(after.get("version").asInt()).isGreaterThan(before.get("version").asInt());
         assertThat(after.at("/days/" + (to - 1) + "/repairs").toString()).contains("Changed by Asha");
+        // the summaries of both changed days are rewritten from their new stops, so none names a stop that left
+        assertThat(after.at("/days/" + (from - 1) + "/summary").asText()).doesNotContain("Chapora Fort");
+        String moved = after.at("/days/" + (to - 1) + "/summary").asText();
+        assertThat(after.get("days").get(to - 1).get("stops").findValuesAsText("title"))
+                .anyMatch(moved::contains);
 
         // swapping the first two stops of a day: whatever is first now starts when the day begins
         JsonNode busy = after.get("days").get(dayOf(after, "Anjuna Market") - 1);

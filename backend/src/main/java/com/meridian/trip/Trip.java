@@ -106,6 +106,10 @@ public class Trip {
         return quorumMinApprovals;
     }
 
+    public void setQuorumMinApprovals(Integer quorumMinApprovals) {
+        this.quorumMinApprovals = quorumMinApprovals;
+    }
+
     public UUID getCreatedBy() {
         return createdBy;
     }

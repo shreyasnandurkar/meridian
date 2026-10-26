@@ -14,6 +14,9 @@ import com.meridian.profile.ProfileModels.AiExtraction;
 import com.meridian.profile.ProfileModels.Provenance;
 import com.meridian.profile.ProfileModels.QuizAnswers;
 import com.meridian.profile.ProfileModels.TravelProfile;
+import com.meridian.realtime.TripEvents;
+import com.meridian.trip.TripMember;
+import com.meridian.trip.TripMemberRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -50,14 +53,18 @@ public class ProfileService {
     private final AiCacheService cache;
     private final PromptLibrary prompts;
     private final AiJobService jobs;
+    private final TripMemberRepository members;
+    private final TripEvents events;
 
     public ProfileService(TravelerProfileRepository profiles, AiClient ai, AiCacheService cache, PromptLibrary prompts,
-            AiJobService jobs) {
+            AiJobService jobs, TripMemberRepository members, TripEvents events) {
         this.profiles = profiles;
         this.ai = ai;
         this.cache = cache;
         this.prompts = prompts;
         this.jobs = jobs;
+        this.members = members;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -133,7 +140,9 @@ public class ProfileService {
     private ProfileView save(UUID userId, TravelProfile profile, QuizAnswers quiz, Provenance provenance) {
         TravelerProfileEntity entity = profiles.findById(userId).orElseGet(() -> new TravelerProfileEntity(userId));
         entity.applyGenerated(profile, quiz, provenance);
-        return ProfileView.from(profiles.save(entity));
+        ProfileView view = ProfileView.from(profiles.save(entity));
+        announce(userId);
+        return view;
     }
 
     @Transactional
@@ -143,7 +152,16 @@ public class ProfileService {
         TravelerProfileEntity entity = profiles.findById(userId)
                 .orElseThrow(() -> ApiException.notFound("Take the quiz first to create your profile"));
         entity.applyEdit(profile);
-        return ProfileView.from(profiles.save(entity));
+        ProfileView view = ProfileView.from(profiles.save(entity));
+        announce(userId);
+        return view;
+    }
+
+    /** A profile feeds group fit in every trip the traveler is in; tell those groups it changed. */
+    private void announce(UUID userId) {
+        for (TripMember m : members.findByIdUserId(userId)) {
+            events.publish(m.getTripId(), TripEvents.Type.MEMBERS, userId);
+        }
     }
 
     /** JSON schema for {@link AiExtraction}, in the strict form OpenAI-compatible hosts accept. */

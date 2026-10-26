@@ -450,6 +450,8 @@ export interface ItineraryStop {
   addedBy: PersonRef;
   addedReason: string | null;
   commentCount: number;
+  /** The latest decision-log entry about this stop. */
+  decisionId: string | null;
 }
 
 export interface ItineraryDay {
@@ -486,6 +488,8 @@ export interface Itinerary {
   openProposals: number;
   canEdit: boolean;
   aiAvailable: boolean;
+  lockedAt: string | null;
+  lockedBy: PersonRef | null;
 }
 
 export type PlanEditType = "MOVE" | "SWAP" | "REMOVE" | "ADD";
@@ -498,7 +502,7 @@ export interface PlanEdit {
   position?: number | null;
 }
 
-export type ProposalStatus = "OPEN" | "WITHDRAWN" | "APPROVED" | "REJECTED" | "STALE";
+export type ProposalStatus = "OPEN" | "WITHDRAWN" | "APPROVED" | "REJECTED" | "STALE" | "CLOSED";
 
 export interface Proposal {
   id: string;
@@ -514,6 +518,12 @@ export interface Proposal {
   problems: string[];
   canWithdraw: boolean;
   commentCount: number;
+  votes: { voter: PersonRef; value: VoteValue; at: string }[];
+  tally: Tally;
+  notVoted: PersonRef[];
+  myVote: VoteValue | null;
+  canVote: boolean;
+  decisionId: string | null;
 }
 
 export type CommentTarget = "SHORTLIST_ITEM" | "PROPOSAL";
@@ -526,4 +536,94 @@ export interface TripComment {
   body: string;
   createdAt: string;
   canDelete: boolean;
+}
+
+// ---- voting, consensus gate, decision log --------------------------------------------------------------------
+
+export type VoteValue = "APPROVE" | "REJECT";
+
+export interface Tally {
+  approvals: number;
+  rejections: number;
+  required: number;
+  members: number;
+}
+
+export interface PlanVoter {
+  userId: string;
+  displayName: string;
+  /** Verdict on the current plan; null when they have not voted on this version. */
+  value: VoteValue | null;
+  /** Verdict on an earlier version of the plan. */
+  earlier: VoteValue | null;
+  at: string | null;
+}
+
+export interface Gate {
+  status: "DRAFT" | "LOCKED";
+  version: number;
+  tally: Tally;
+  quorumMet: boolean;
+  voters: PlanVoter[];
+  notVoted: PersonRef[];
+  myVote: VoteValue | null;
+  canVote: boolean;
+  canLock: boolean;
+  openProposals: number;
+  lockedAt: string | null;
+  lockedBy: PersonRef | null;
+  lockDecisionId: string | null;
+}
+
+export type DecisionKind = "CHANGE_APPROVED" | "CHANGE_REJECTED" | "PLAN_LOCKED" | "LOCK_OVERRIDE" | "PLAN_UNLOCKED";
+
+export interface Decision {
+  id: string;
+  seq: number;
+  kind: DecisionKind;
+  title: string;
+  alternatives: string[];
+  votes: { userId: string; displayName: string; value: VoteValue; at: string }[];
+  tally: Tally;
+  notVoted: { userId: string; displayName: string }[];
+  proposalId: string | null;
+  reason: string | null;
+  itineraryVersion: number | null;
+  itemIds: string[];
+  decidedBy: PersonRef | null;
+  decidedAt: string;
+  summary: string;
+  provenance: Provenance;
+  summaryPending: boolean;
+  canSummarize: boolean;
+}
+
+export type TripEventType =
+  | "PROPOSALS"
+  | "VOTES"
+  | "APPROVAL"
+  | "ITINERARY"
+  | "DECISIONS"
+  | "COMMENTS"
+  | "SHORTLIST"
+  | "MEMBERS"
+  | "TRIP"
+  | "AI_JOB";
+
+export interface TripEvent {
+  type: TripEventType;
+  tripId: string;
+  actorId: string | null;
+  data: Record<string, unknown>;
+  at: string;
+}
+
+/** An AI job someone in the group is running, from live events. */
+export interface AiActivity {
+  jobId: string;
+  feature: string;
+  status: AiJob["status"];
+  percent: number;
+  message: string;
+  ownerId: string | null;
 }

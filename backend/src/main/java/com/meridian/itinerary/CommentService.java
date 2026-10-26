@@ -1,6 +1,7 @@
 package com.meridian.itinerary;
 
 import com.meridian.common.ApiException;
+import com.meridian.realtime.TripEvents;
 import com.meridian.itinerary.ItineraryDtos.CommentRequest;
 import com.meridian.itinerary.ItineraryDtos.CommentView;
 import com.meridian.shortlist.ShortlistDtos.Person;
@@ -25,14 +26,16 @@ public class CommentService {
     private final ShortlistItemRepository shortlist;
     private final ProposalRepository proposals;
     private final UserRepository users;
+    private final TripEvents events;
 
     public CommentService(TripAccess access, CommentRepository comments, ShortlistItemRepository shortlist,
-            ProposalRepository proposals, UserRepository users) {
+            ProposalRepository proposals, UserRepository users, TripEvents events) {
         this.access = access;
         this.comments = comments;
         this.shortlist = shortlist;
         this.proposals = proposals;
         this.users = users;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -54,6 +57,7 @@ public class CommentService {
         if (!exists) throw ApiException.notFound("Nothing to comment on");
         Comment saved = comments.save(new Comment(tripId, req.targetType(), req.targetId(), userId, req.body()));
         String name = users.findById(userId).map(User::getDisplayName).orElse("You");
+        events.publish(tripId, TripEvents.Type.COMMENTS, userId);
         return view(saved, me, name);
     }
 
@@ -65,6 +69,7 @@ public class CommentService {
                 .orElseThrow(() -> ApiException.notFound("Comment not found"));
         if (!canDelete(c, me)) throw ApiException.forbidden("You can only delete your own comments");
         comments.delete(c);
+        events.publish(tripId, TripEvents.Type.COMMENTS, userId);
     }
 
     private static boolean canDelete(Comment c, TripMember me) {

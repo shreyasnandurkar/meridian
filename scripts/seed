@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Seed the classroom demo (Goa, 5 days, 4 travelers, cached AI results). Pass --reset to seed it again.
+exec node "$(dirname "$0")/seed.mjs" "$@"

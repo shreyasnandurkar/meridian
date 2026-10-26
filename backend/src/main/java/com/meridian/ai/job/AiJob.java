@@ -3,6 +3,7 @@ package com.meridian.ai.job;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.Future;
+import java.util.function.Consumer;
 
 /** In-memory state of one async AI job. Fields are written by the worker thread and read by pollers. */
 public class AiJob {
@@ -21,6 +22,8 @@ public class AiJob {
     private volatile String error;
     private volatile Instant finishedAt;
     private volatile Future<?> future;
+    /** Told about every change of status or progress; used to publish trip events. */
+    private volatile Consumer<AiJob> listener = j -> { };
 
     AiJob(UUID ownerId, String feature) {
         this.ownerId = ownerId;
@@ -32,6 +35,7 @@ public class AiJob {
         this.status = Status.RUNNING;
         this.percent = Math.max(this.percent, Math.min(100, percent));
         this.message = message;
+        listener.accept(this);
     }
 
     void succeed(Object result) {
@@ -41,6 +45,7 @@ public class AiJob {
         this.message = "Done";
         this.status = Status.SUCCEEDED;
         this.finishedAt = Instant.now();
+        listener.accept(this);
     }
 
     void fail(String error) {
@@ -49,6 +54,7 @@ public class AiJob {
         this.message = "Failed";
         this.status = Status.FAILED;
         this.finishedAt = Instant.now();
+        listener.accept(this);
     }
 
     void cancelled() {
@@ -56,10 +62,15 @@ public class AiJob {
         this.message = "Cancelled";
         this.status = Status.CANCELLED;
         this.finishedAt = Instant.now();
+        listener.accept(this);
     }
 
     boolean isTerminal() {
         return status == Status.SUCCEEDED || status == Status.FAILED || status == Status.CANCELLED;
+    }
+
+    void listen(Consumer<AiJob> listener) {
+        this.listener = listener;
     }
 
     void attach(Future<?> future) {

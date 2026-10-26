@@ -1,5 +1,7 @@
 package com.meridian.itinerary;
 
+import com.meridian.decision.Tally;
+import com.meridian.decision.Vote;
 import com.meridian.place.PlaceCategory;
 import com.meridian.profile.ProfileModels.Provenance;
 import com.meridian.shortlist.ShortlistDtos.Person;
@@ -35,7 +37,9 @@ public final class ItineraryDtos {
             String note,
             Person addedBy,
             String addedReason,
-            int commentCount) {}
+            int commentCount,
+            /* the latest decision-log entry about this stop (a change the group approved, or the lock) */
+            UUID decisionId) {}
 
     public record DayView(
             int index,
@@ -66,7 +70,9 @@ public final class ItineraryDtos {
             List<UnplacedView> unplaced,
             int openProposals,
             boolean canEdit,
-            boolean aiAvailable) {}
+            boolean aiAvailable,
+            Instant lockedAt,
+            Person lockedBy) {}
 
     public record ProposeRequest(@NotNull @Valid PlanEdit edit, @Size(max = 500) String reason) {}
 
@@ -85,7 +91,16 @@ public final class ItineraryDtos {
             /* why it could not be applied to the plan as it is now; empty when it can */
             List<String> problems,
             boolean canWithdraw,
-            int commentCount) {}
+            int commentCount,
+            List<VoteView> votes,
+            Tally tally,
+            List<Person> notVoted,
+            Vote.Value myVote,
+            boolean canVote,
+            /* the decision-log entry written when the vote closed */
+            UUID decisionId) {}
+
+    public record VoteView(Person voter, Vote.Value value, Instant at) {}
 
     public record CommentRequest(
             @NotNull Comment.Target targetType,
