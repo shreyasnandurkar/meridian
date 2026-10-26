@@ -16,7 +16,9 @@ import {
   Users,
 } from "lucide-react";
 
+import { CompareTab } from "@/components/compare/compare-tab";
 import { ErrorState } from "@/components/error-state";
+import { GroupFitTab } from "@/components/groupfit/group-fit-tab";
 import { PageLoading, RequireAuth } from "@/components/require-auth";
 import { MembersTab } from "@/components/trip/members-tab";
 import { OverviewTab } from "@/components/trip/overview-tab";
@@ -128,20 +130,10 @@ function TripHub() {
           <ShortlistTab trip={t} />
         </TabsContent>
         <TabsContent value="group-fit">
-          <PlaceholderTab
-            icon={Scale}
-            title="Group fit"
-            body="See where the group's budgets, pace and interests agree or clash, and how well each place fits everyone."
-            milestone={4}
-          />
+          <GroupFitTab trip={t} />
         </TabsContent>
         <TabsContent value="compare">
-          <PlaceholderTab
-            icon={GitCompareArrows}
-            title="Compare options"
-            body="Stays and activities side by side, each price with its source and when it was checked."
-            milestone={4}
-          />
+          <CompareTab trip={t} />
         </TabsContent>
         <TabsContent value="itinerary">
           <PlaceholderTab

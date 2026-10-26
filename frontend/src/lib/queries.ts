@@ -6,6 +6,14 @@ import { api } from "@/lib/api";
 import type {
   AddShortlistInput,
   AiJob,
+  Comparison,
+  ComparisonKind,
+  GroupFit,
+  OptionDraft,
+  OptionRowInput,
+  RecommendationQuery,
+  RecommendationSet,
+  TradeoffSummary,
   AiStatus,
   CreateTripInput,
   GeoResult,
@@ -40,6 +48,10 @@ export const keys = {
   shortlist: (tripId: string) => ["trip", tripId, "shortlist"] as const,
   placeSearch: (tripId: string, q: string) => ["trip", tripId, "places", "search", q] as const,
   nearby: (tripId: string, category: PlaceCategory) => ["trip", tripId, "places", "nearby", category] as const,
+  groupFit: (tripId: string) => ["trip", tripId, "group-fit"] as const,
+  recommendations: (tripId: string, category: PlaceCategory, gems: number | null, avoidCrowds: boolean) =>
+    ["trip", tripId, "recommendations", category, gems, avoidCrowds] as const,
+  comparisons: (tripId: string) => ["trip", tripId, "comparisons"] as const,
 };
 
 export function useVocabulary() {
@@ -179,7 +191,10 @@ export function useUpdateTripPreferences(tripId: string) {
   return useMutation({
     mutationFn: (prefs: Pick<TripPreferences, "budgetMin" | "budgetMax" | "mustHaves" | "budgetVisible">) =>
       api<TripPreferences>(`/api/trips/${tripId}/preferences/me`, { method: "PUT", body: JSON.stringify(prefs) }),
-    onSuccess: (prefs) => qc.setQueryData(keys.preferences(tripId), prefs),
+    onSuccess: (prefs) => {
+      qc.setQueryData(keys.preferences(tripId), prefs);
+      invalidateDerived(qc, tripId);
+    },
   });
 }
 
@@ -201,6 +216,12 @@ export function useShortlist(tripId: string) {
   });
 }
 
+/** Group fit and suggestions are computed from the shortlist and preferences; refresh them after changes. */
+function invalidateDerived(qc: ReturnType<typeof useQueryClient>, tripId: string) {
+  qc.invalidateQueries({ queryKey: keys.groupFit(tripId) });
+  qc.invalidateQueries({ queryKey: ["trip", tripId, "recommendations"] });
+}
+
 function replaceItem(list: ShortlistItem[] | undefined, item: ShortlistItem) {
   return list?.map((i) => (i.id === item.id ? item : i));
 }
@@ -212,6 +233,7 @@ export function useAddShortlistItem(tripId: string) {
       api<ShortlistItem>(`/api/trips/${tripId}/shortlist`, { method: "POST", body: JSON.stringify(input) }),
     onSuccess: (item) =>
       qc.setQueryData<ShortlistItem[]>(keys.shortlist(tripId), (old) => [item, ...(old ?? [])]),
+    onSettled: () => invalidateDerived(qc, tripId),
   });
 }
 
@@ -235,6 +257,7 @@ export function useRemoveShortlistItem(tripId: string) {
       return { previous };
     },
     onError: (_e, _id, ctx) => qc.setQueryData(keys.shortlist(tripId), ctx?.previous),
+    onSettled: () => invalidateDerived(qc, tripId),
   });
 }
 
@@ -271,6 +294,7 @@ export function useReact(tripId: string, me: { id: string; displayName: string }
     },
     onError: (_e, _v, ctx) => qc.setQueryData(keys.shortlist(tripId), ctx?.previous),
     onSuccess: (item) => qc.setQueryData<ShortlistItem[]>(keys.shortlist(tripId), (old) => replaceItem(old, item)),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.groupFit(tripId) }),
   });
 }
 
@@ -299,5 +323,113 @@ export function useLinkPreview(tripId: string) {
   return useMutation({
     mutationFn: (url: string) =>
       api<LinkPreview>(`/api/trips/${tripId}/link-preview?url=${encodeURIComponent(url)}`),
+  });
+}
+
+// ---- group fit, recommendations, compare -------------------------------------------------------
+
+export function useGroupFit(tripId: string) {
+  return useQuery({ queryKey: keys.groupFit(tripId), queryFn: () => api<GroupFit>(`/api/trips/${tripId}/group-fit`) });
+}
+
+/** A3: starts an AI job that phrases the trade-offs. */
+export function useStartTradeoffs(tripId: string) {
+  return useMutation({
+    mutationFn: (regenerate: boolean) =>
+      api<AiJob<TradeoffSummary>>(`/api/trips/${tripId}/group-fit/tradeoffs?regenerate=${regenerate}`, {
+        method: "POST",
+      }),
+  });
+}
+
+/** Instant: cached AI suggestions for these settings, else the rule-based ranking. */
+export function useRecommendations(tripId: string, query: RecommendationQuery, enabled = true) {
+  const params = new URLSearchParams({ category: query.category, avoidCrowds: String(query.avoidCrowds) });
+  if (query.gems != null) params.set("gems", String(query.gems));
+  return useQuery({
+    queryKey: keys.recommendations(tripId, query.category, query.gems, query.avoidCrowds),
+    queryFn: () => api<RecommendationSet>(`/api/trips/${tripId}/recommendations?${params}`),
+    enabled,
+    staleTime: 60_000,
+    retry: false,
+    placeholderData: (prev) => (prev?.category === query.category ? prev : undefined),
+  });
+}
+
+/** A2: starts an AI job that re-ranks and explains the top suggestions. */
+export function useStartRecommendationAi(tripId: string) {
+  return useMutation({
+    mutationFn: (query: RecommendationQuery) =>
+      api<AiJob<RecommendationSet>>(`/api/trips/${tripId}/recommendations/ai`, {
+        method: "POST",
+        body: JSON.stringify(query),
+      }),
+  });
+}
+
+export function useComparisons(tripId: string) {
+  return useQuery({
+    queryKey: keys.comparisons(tripId),
+    queryFn: () => api<Comparison[]>(`/api/trips/${tripId}/comparisons`),
+  });
+}
+
+function replaceComparison(list: Comparison[] | undefined, c: Comparison) {
+  return list?.map((x) => (x.id === c.id ? c : x));
+}
+
+export function useCreateComparison(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { kind: ComparisonKind; title: string }) =>
+      api<Comparison>(`/api/trips/${tripId}/comparisons`, { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: (c) => qc.setQueryData<Comparison[]>(keys.comparisons(tripId), (old) => [...(old ?? []), c]),
+  });
+}
+
+export function useDeleteComparison(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/api/trips/${tripId}/comparisons/${id}`, { method: "DELETE" }),
+    onSuccess: (_v, id) =>
+      qc.setQueryData<Comparison[]>(keys.comparisons(tripId), (old) => old?.filter((c) => c.id !== id)),
+  });
+}
+
+/** Add (no `rowId`) or replace a row; the server answers with the whole comparison. */
+export function useSaveOptionRow(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ comparisonId, rowId, input }: { comparisonId: string; rowId?: string; input: OptionRowInput }) =>
+      api<Comparison>(`/api/trips/${tripId}/comparisons/${comparisonId}/rows${rowId ? `/${rowId}` : ""}`, {
+        method: rowId ? "PUT" : "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (c) => qc.setQueryData<Comparison[]>(keys.comparisons(tripId), (old) => replaceComparison(old, c)),
+  });
+}
+
+export function useRecheckOptionRow(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ comparisonId, rowId }: { comparisonId: string; rowId: string }) =>
+      api<Comparison>(`/api/trips/${tripId}/comparisons/${comparisonId}/rows/${rowId}/recheck`, { method: "POST" }),
+    onSuccess: (c) => qc.setQueryData<Comparison[]>(keys.comparisons(tripId), (old) => replaceComparison(old, c)),
+  });
+}
+
+export function useDeleteOptionRow(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ comparisonId, rowId }: { comparisonId: string; rowId: string }) =>
+      api<Comparison>(`/api/trips/${tripId}/comparisons/${comparisonId}/rows/${rowId}`, { method: "DELETE" }),
+    onSuccess: (c) => qc.setQueryData<Comparison[]>(keys.comparisons(tripId), (old) => replaceComparison(old, c)),
+  });
+}
+
+export function useOptionDraft(tripId: string) {
+  return useMutation({
+    mutationFn: (url: string) =>
+      api<OptionDraft>(`/api/trips/${tripId}/comparisons/draft?url=${encodeURIComponent(url)}`),
   });
 }

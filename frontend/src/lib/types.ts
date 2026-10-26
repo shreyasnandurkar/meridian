@@ -249,3 +249,176 @@ export interface LinkPreview {
   host: string;
   title: string | null;
 }
+
+// ---- group fit (spec §5.4) ---------------------------------------------------------------------
+
+export type FitStatus = "AGREE" | "TRADE_OFF" | "CONFLICT" | "PLAN_AROUND" | "UNKNOWN";
+
+/** One member's value for one attribute; `hidden` = someone else's private budget. */
+export interface FitCell {
+  userId: string;
+  value: string;
+  detail: string | null;
+  level: number | null;
+  hidden: boolean;
+}
+
+export interface FitRow {
+  key: string;
+  label: string;
+  status: FitStatus;
+  cells: FitCell[];
+  summary: string;
+  suggestion: string | null;
+  facts: string[];
+}
+
+export interface Contribution {
+  userId: string;
+  displayName: string;
+  organizer: boolean;
+  hasProfile: boolean;
+  tripBudgetSet: boolean;
+  itemsAdded: number;
+  reactions: number;
+  itemsToReact: number;
+  missing: string[];
+}
+
+export type FitVerdict = "SATISFIES" | "NEUTRAL" | "MISSES" | "UNKNOWN";
+export type FitEffect = "PLUS" | "MINUS" | "BLOCKER" | "NOTE";
+
+export interface MemberFit {
+  userId: string;
+  displayName: string;
+  score: number | null;
+  verdict: FitVerdict;
+  reasons: { effect: FitEffect; text: string }[];
+  reaction: ReactionValue | null;
+}
+
+export interface ItemFit {
+  itemId: string;
+  title: string;
+  score: number | null;
+  satisfied: number;
+  missed: number;
+  unknown: number;
+  members: MemberFit[];
+  summary: string;
+}
+
+export interface Tradeoff {
+  key: string;
+  headline: string;
+  explanation: string;
+  suggestion: string | null;
+}
+
+export interface TradeoffSummary {
+  items: Tradeoff[];
+  provenance: Provenance;
+  inputKey: string;
+}
+
+export interface GroupFit {
+  contributions: Contribution[];
+  rows: FitRow[];
+  counts: { agree: number; tradeOff: number; conflict: number; planAround: number; unknown: number };
+  sharedBudget: { currency: string; min: number | null; max: number | null; membersWithBudget: number };
+  items: ItemFit[];
+  tradeoffs: TradeoffSummary;
+  aiAvailable: boolean;
+}
+
+// ---- recommendations (spec §5.5) ---------------------------------------------------------------
+
+export interface Recommendation {
+  place: Place;
+  rank: number;
+  rulesRank: number;
+  score: number;
+  why: string;
+  matchedInterests: string[];
+  fitsMembers: string[];
+  missesMembers: string[];
+  localSignals: string[];
+  distanceKm: number;
+  /** Always false today; the "Sponsored" label renders only when true. */
+  sponsored: boolean;
+}
+
+export interface RecommendationSet {
+  category: PlaceCategory;
+  gems: number;
+  groupGems: number;
+  avoidCrowds: boolean;
+  items: Recommendation[];
+  candidates: number;
+  placesSource: string;
+  placesCheckedAt: string | null;
+  placesStale: boolean;
+  provenance: Provenance;
+  inputKey: string;
+  aiAvailable: boolean;
+}
+
+export interface RecommendationQuery {
+  category: PlaceCategory;
+  gems: number | null;
+  avoidCrowds: boolean;
+  regenerate?: boolean;
+}
+
+// ---- compare (spec §5.6) -----------------------------------------------------------------------
+
+export type ComparisonKind = "STAY" | "FLIGHT" | "ACTIVITY" | "TRANSPORT" | "OTHER";
+
+export interface OptionRow {
+  id: string;
+  provider: string;
+  title: string | null;
+  price: number | null;
+  currency: string | null;
+  checkedAt: string | null;
+  stale: boolean;
+  sourceUrl: string | null;
+  sourceHost: string | null;
+  sponsored: boolean;
+  notes: string | null;
+  adapter: string;
+  addedBy: { userId: string; displayName: string };
+  cheapest: boolean;
+  canEdit: boolean;
+}
+
+export interface Comparison {
+  id: string;
+  kind: ComparisonKind;
+  title: string;
+  createdBy: { userId: string; displayName: string };
+  createdAt: string;
+  rows: OptionRow[];
+  canEdit: boolean;
+}
+
+export interface OptionRowInput {
+  provider: string;
+  title?: string | null;
+  price?: number | null;
+  currency?: string | null;
+  checkedAt?: string | null;
+  sourceUrl?: string | null;
+  sponsored: boolean;
+  notes?: string | null;
+  adapter?: string | null;
+}
+
+export interface OptionDraft {
+  provider: string;
+  title: string | null;
+  price: number | null;
+  currency: string | null;
+  sourceUrl: string;
+  adapter: string;
+}

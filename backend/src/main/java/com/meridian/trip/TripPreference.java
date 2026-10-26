@@ -50,6 +50,10 @@ public class TripPreference {
         this.updatedAt = Instant.now();
     }
 
+    public UUID getUserId() {
+        return id.userId();
+    }
+
     public BigDecimal getBudgetMin() {
         return budgetMin;
     }

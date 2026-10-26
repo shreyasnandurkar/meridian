@@ -21,8 +21,10 @@ export const ShortlistItemCard = forwardRef<
     onSelect?: () => void;
     onEdit: () => void;
     onReact: (value: ReactionValue | null, reason?: string) => void;
+    /** Group-fit score from the Group fit computation, when known. */
+    fit?: { score: number | null; summary: string };
   }
->(function ShortlistItemCard({ item, origin, myId, selected, onSelect, onEdit, onReact }, ref) {
+>(function ShortlistItemCard({ item, origin, myId, selected, onSelect, onEdit, onReact, fit }, ref) {
   const cat = CATEGORY[item.category];
   const Icon = cat.icon;
   const distance =
@@ -74,6 +76,23 @@ export const ShortlistItemCard = forwardRef<
             {distance != null && <span>· {formatDistance(distance)} from centre</span>}
             {where && <span className="truncate">· {where}</span>}
           </p>
+          {fit && fit.score != null && (
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" title={fit.summary}>
+              <span
+                className={cn(
+                  "figures inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium",
+                  fit.score >= 65
+                    ? "border-success/30 bg-success/10"
+                    : fit.score >= 40
+                      ? "border-warning/40 bg-warning/12"
+                      : "border-destructive/35 bg-destructive/10",
+                )}
+              >
+                Group fit {fit.score}
+              </span>
+              <span className="text-muted-foreground">{fit.summary}</span>
+            </p>
+          )}
           {highlights.length > 0 && (
             <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Highlights">
               {highlights.map((h) => (

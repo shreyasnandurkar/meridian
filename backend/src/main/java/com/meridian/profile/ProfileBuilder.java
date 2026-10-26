@@ -15,7 +15,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Deterministic half of A1. Structured quiz answers map straight onto the profile (no model needed); only the
@@ -41,7 +40,7 @@ public final class ProfileBuilder {
             for (Vocabulary.Interest interest : Vocabulary.INTERESTS) {
                 if (q.interestRatings().containsKey(interest.tag())) continue;
                 for (String keyword : interest.keywords()) {
-                    Matcher m = keywordPattern(keyword).matcher(text);
+                    Matcher m = Vocabulary.keywordPattern(keyword).matcher(text);
                     if (m.find()) {
                         extras.add(new ExtraInterest(interest.tag(), RULE_WEIGHT, snippet(text, m.start(), m.end())));
                         break;
@@ -124,11 +123,6 @@ public final class ProfileBuilder {
 
     private static List<String> distinct(List<String> items) {
         return new ArrayList<>(new LinkedHashSet<>(items));
-    }
-
-    private static Pattern keywordPattern(String keyword) {
-        return Pattern.compile("\\b" + Pattern.quote(keyword) + "(?:s|es)?\\b",
-                Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     }
 
     /** A few words around a keyword match, cut on word boundaries, as evidence. */

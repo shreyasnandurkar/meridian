@@ -1,5 +1,6 @@
 "use client";
 
+import type * as React from "react";
 import { Cpu, HelpCircle, RefreshCw, Sparkles, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -24,8 +25,11 @@ export function AiProvenance({
   onRegenerate,
   onDismiss,
   regenerating,
+  details,
 }: {
   provenance: Provenance;
+  /** Feature-specific explanation shown in the popover instead of the profile wording. */
+  details?: React.ReactNode;
   interestLabels?: Record<string, string>;
   onRegenerate?: () => void;
   onDismiss?: () => void;
@@ -57,7 +61,9 @@ export function AiProvenance({
               : "Built with deterministic rules — no AI model was used."}{" "}
             {provenance.note}
           </p>
-          {provenance.inferences.length > 0 ? (
+          {details ? (
+            details
+          ) : provenance.inferences.length > 0 ? (
             <div>
               <p className="mb-1.5 text-sm font-medium">Picked up from your description</p>
               <ul className="space-y-1.5">

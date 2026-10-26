@@ -1,10 +1,13 @@
 package com.meridian;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -50,6 +53,19 @@ public abstract class IntegrationTestBase {
                 .andReturn().getResponse().getContentAsString();
         JsonNode node = json.readTree(body);
         return new TestUser(UUID.fromString(node.at("/user/id").asText()), email, node.get("token").asText());
+    }
+
+    /** Polls an AI job until it leaves QUEUED/RUNNING. */
+    protected JsonNode waitForJob(TestUser user, String jobId) throws Exception {
+        Instant deadline = Instant.now().plus(Duration.ofSeconds(10));
+        while (true) {
+            JsonNode job = read(mvc.perform(get("/api/ai/jobs/{id}", jobId).header("Authorization", user.bearer()))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            String s = job.get("status").asText();
+            if (!s.equals("QUEUED") && !s.equals("RUNNING")) return job;
+            if (Instant.now().isAfter(deadline)) throw new AssertionError("job did not finish: " + job);
+            Thread.sleep(50);
+        }
     }
 
     protected JsonNode read(String body) throws Exception {

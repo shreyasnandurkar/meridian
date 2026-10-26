@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { List, ListChecks, Map as MapIcon, Plus } from "lucide-react";
+import { List, ListChecks, Map as MapIcon, Plus, Sparkles } from "lucide-react";
 
 import { ErrorState } from "@/components/error-state";
 import { TripMap, type MapMarker } from "@/components/map/trip-map";
 import { AddPlaceDialog } from "@/components/shortlist/add-place-dialog";
+import { SuggestionsPanel } from "@/components/recommend/suggestions-panel";
 import { EditItemDialog } from "@/components/shortlist/edit-item-dialog";
 import { ShortlistItemCard } from "@/components/shortlist/shortlist-item-card";
 import { Button } from "@/components/ui/button";
@@ -14,21 +15,24 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAuth } from "@/lib/auth";
 import { initials } from "@/lib/format";
 import { CATEGORIES, CATEGORY } from "@/lib/places";
-import { useReact, useShortlist } from "@/lib/queries";
+import { useGroupFit, useReact, useShortlist } from "@/lib/queries";
 import type { PlaceCategory, ShortlistItem, TripDetail } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type View = "list" | "map";
+type View = "list" | "map" | "suggest";
+type FitFilter = "ALL" | "GOOD" | "MIXED";
 
 export function ShortlistTab({ trip }: { trip: TripDetail }) {
   const { user } = useAuth();
   const me = { id: user!.id, displayName: user!.displayName };
   const shortlist = useShortlist(trip.id);
   const react = useReact(trip.id, me);
+  const groupFit = useGroupFit(trip.id);
 
   const [view, setView] = useState<View>("list");
   const [category, setCategory] = useState<PlaceCategory | "ALL">("ALL");
   const [adder, setAdder] = useState<string>("ALL");
+  const [fitFilter, setFitFilter] = useState<FitFilter>("ALL");
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<ShortlistItem | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -39,12 +43,20 @@ export function ShortlistTab({ trip }: { trip: TripDetail }) {
       ? { lat: trip.destinationLat, lng: trip.destinationLng }
       : null;
   const items = useMemo(() => shortlist.data ?? [], [shortlist.data]);
+  const fits = useMemo(
+    () => new Map((groupFit.data?.items ?? []).map((f) => [f.itemId, { score: f.score, summary: f.summary }])),
+    [groupFit.data],
+  );
   const filtered = useMemo(
     () =>
-      items.filter(
-        (i) => (category === "ALL" || i.category === category) && (adder === "ALL" || i.addedBy.userId === adder),
-      ),
-    [items, category, adder],
+      items.filter((i) => {
+        if (category !== "ALL" && i.category !== category) return false;
+        if (adder !== "ALL" && i.addedBy.userId !== adder) return false;
+        if (fitFilter === "ALL") return true;
+        const score = fits.get(i.id)?.score;
+        return score != null && score >= (fitFilter === "GOOD" ? 65 : 40);
+      }),
+    [items, category, adder, fitFilter, fits],
   );
   const markers: MapMarker[] = useMemo(
     () =>
@@ -92,6 +104,7 @@ export function ShortlistTab({ trip }: { trip: TripDetail }) {
           }}
           onEdit={() => setEditing(item)}
           onReact={(value, reason) => react.mutate({ itemId: item.id, value, reason })}
+          fit={fits.get(item.id)}
         />
       ))}
     </ul>
@@ -109,23 +122,30 @@ export function ShortlistTab({ trip }: { trip: TripDetail }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {items.length > 0 && (
-            <ToggleGroup type="single" value={view} onValueChange={(v) => v && setView(v as View)} aria-label="View">
+          <ToggleGroup type="single" value={view} onValueChange={(v) => v && setView(v as View)} aria-label="View">
+            {items.length > 0 && (
               <ToggleGroupItem value="list">
                 <List aria-hidden /> List
               </ToggleGroupItem>
+            )}
+            {items.length > 0 && (
               <ToggleGroupItem value="map">
                 <MapIcon aria-hidden /> Map
               </ToggleGroupItem>
-            </ToggleGroup>
-          )}
+            )}
+            <ToggleGroupItem value="suggest">
+              <Sparkles className="text-signal" aria-hidden /> Suggestions
+            </ToggleGroupItem>
+          </ToggleGroup>
           <Button onClick={() => setAdding(true)}>
             <Plus aria-hidden /> Add a place
           </Button>
         </div>
       </div>
 
-      {items.length === 0 ? (
+      {view === "suggest" ? (
+        <SuggestionsPanel trip={trip} />
+      ) : items.length === 0 ? (
         <div className="graticule flex flex-col items-center rounded-xl border border-dashed px-6 py-16 text-center">
           <ListChecks className="text-muted-foreground size-8" aria-hidden />
           <h3 className="mt-4 font-medium">Nothing on the shortlist yet</h3>
@@ -133,9 +153,14 @@ export function ShortlistTab({ trip }: { trip: TripDetail }) {
             Search OpenStreetMap, paste a link to a stay or tour, or drop a pin on the map. Say why, so the group
             knows what you liked about it.
           </p>
-          <Button className="mt-6" onClick={() => setAdding(true)}>
-            <Plus aria-hidden /> Add the first place
-          </Button>
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <Button onClick={() => setAdding(true)}>
+              <Plus aria-hidden /> Add the first place
+            </Button>
+            <Button variant="outline" onClick={() => setView("suggest")}>
+              <Sparkles className="text-signal" aria-hidden /> Get suggestions
+            </Button>
+          </div>
         </div>
       ) : (
         <>
@@ -162,6 +187,18 @@ export function ShortlistTab({ trip }: { trip: TripDetail }) {
                 ))}
               </NativeSelect>
             </label>
+            <label className="text-muted-foreground flex items-center gap-2 text-sm">
+              Group fit
+              <NativeSelect
+                className="h-8 w-auto py-0"
+                value={fitFilter}
+                onChange={(e) => setFitFilter(e.target.value as FitFilter)}
+              >
+                <option value="ALL">Any</option>
+                <option value="GOOD">Good fit (65+)</option>
+                <option value="MIXED">At least mixed (40+)</option>
+              </NativeSelect>
+            </label>
           </div>
 
           {filtered.length === 0 ? (
@@ -173,6 +210,7 @@ export function ShortlistTab({ trip }: { trip: TripDetail }) {
                 onClick={() => {
                   setCategory("ALL");
                   setAdder("ALL");
+                  setFitFilter("ALL");
                 }}
               >
                 Clear filters

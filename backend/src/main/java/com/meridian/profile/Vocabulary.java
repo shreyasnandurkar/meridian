@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -86,6 +87,22 @@ public final class Vocabulary {
         Map<String, String> labels = new LinkedHashMap<>();
         INTERESTS.forEach(i -> labels.put(i.tag(), i.label()));
         return labels;
+    }
+
+    /** Whole-word, case-insensitive match for a keyword, allowing a plural ending. */
+    public static Pattern keywordPattern(String keyword) {
+        return Pattern.compile("\\b" + Pattern.quote(keyword) + "(?:s|es)?\\b",
+                Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+    }
+
+    /** Interest tags whose keywords (or label) appear in free text, in vocabulary order. */
+    public static List<String> interestsMentioned(String text) {
+        if (text == null || text.isBlank()) return List.of();
+        return INTERESTS.stream()
+                .filter(i -> keywordPattern(i.label()).matcher(text).find()
+                        || i.keywords().stream().anyMatch(k -> keywordPattern(k).matcher(text).find()))
+                .map(Interest::tag)
+                .toList();
     }
 
     public static String label(List<Option> options, String id) {

@@ -9,8 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.time.Duration;
-import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
@@ -23,18 +21,6 @@ class ProfileIntegrationTest extends IntegrationTestBase {
              "crowdTolerance":20,"hiddenGems":80,"dietary":["vegetarian"],"accessNeeds":[],
              "mustHaves":["Sea view"],"dealbreakers":[],
              "idealTrip":"Lazy mornings at a cafe, then a kayak trip to spot dolphins."}""";
-
-    private JsonNode waitForJob(TestUser user, String jobId) throws Exception {
-        Instant deadline = Instant.now().plus(Duration.ofSeconds(10));
-        while (true) {
-            JsonNode job = read(mvc.perform(get("/api/ai/jobs/{id}", jobId).header("Authorization", user.bearer()))
-                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-            String s = job.get("status").asText();
-            if (!s.equals("QUEUED") && !s.equals("RUNNING")) return job;
-            if (Instant.now().isAfter(deadline)) throw new AssertionError("job did not finish: " + job);
-            Thread.sleep(50);
-        }
-    }
 
     @Test
     void quizBuildsRuleBasedProfileWhenAiIsOff() throws Exception {
