@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Benchmark the configured AI model (tokens/sec, JSON-validity rate) and record it in docs/AI_DESIGN.md.
+exec node "$(dirname "$0")/ai-benchmark.mjs" "$@"

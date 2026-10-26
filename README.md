@@ -2,7 +2,7 @@
 
 AI-powered collaborative trip planning. A group plans one trip in a shared space; an AI learns each traveler's style, reconciles the group's preferences and proposes ad-free, non-touristy itineraries that the group votes on and edits.
 
-> Status: **Milestone 1 (foundation)**: auth, health check, app skeletons.
+> Status: **Milestone 2 (trips & profile)**: trips, invite links, roles, trip hub, onboarding quiz with AI travel-style profile (A1) and rule-based fallback.
 
 ## Run with Docker
 
@@ -24,6 +24,17 @@ mvn -f backend spring-boot:run          # API on :8080
 npm --prefix frontend install
 npm --prefix frontend run dev           # UI on :3000
 ```
+
+## AI model
+
+AI runs locally via [Ollama](https://ollama.com) (OpenAI-compatible API). Set `AI_MODEL` in `.env` to a model you have pulled, e.g.
+
+```bash
+ollama pull qwen3:4b-instruct-2507
+node scripts/ai-benchmark.mjs      # tokens/s + JSON validity → docs/AI_DESIGN.md
+```
+
+With `AI_ENABLED=false` (or Ollama stopped) every AI feature falls back to deterministic rules.
 
 ## Tests
 
