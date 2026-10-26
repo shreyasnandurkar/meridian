@@ -94,6 +94,29 @@ Code computes every row of the matrix together with `facts` (for example "Asha i
 - The model never sees a private budget amount, only anonymous counts and the shared range.
 - Results are cached per facts hash, so the Group fit screen loads the cached text instantly. With no cache, or with AI off, the template sentences built from the same facts are shown.
 
+## A4 — Draft itinerary
+
+Code does almost all of the work. The model only orders one day and suggests times and short notes.
+
+1. **Stops.** Every shortlisted place or pin with a location becomes a stop: 90 min for sights, 75 for food, 150 for activities, 60 otherwise. Stays and links without a location are listed under "Not on the plan", with the reason.
+2. **Pace.** The group's pace is the median of members' profile paces (an even split of different paces gives balanced). It sets the day window and the number of stops: slow 10:00–19:00 and 3 stops, balanced 09:30–20:00 and 4, packed 08:30–21:30 and 6. The organizer can override it.
+3. **Days.** If there are more stops than `days × stops per day`, the lowest group-fit scores are left out, each with a reason. The rest are clustered by **size-capped complete-linkage agglomerative clustering**, which keeps merging the two groups whose farthest-apart members are closest while the merge still fits in a day. Days are then ordered west to east. Places far apart never share a day just to even out day sizes, and the same shortlist always gives the same days.
+4. **Rule plan.** A nearest-neighbour route from the trip's destination (or the middle of all stops when the destination has no coordinates) runs through the non-meal stops; meals are inserted nearest to 13:00 or 19:30. If the day runs past its end, the stop with the lowest fit is dropped and recorded.
+5. **Model (`itinerary-day-v2`, one call per day).** The model sees short ids `s1…sN` in rule order, each stop's category, duration and what it offers, all pairwise travel times, and the day window. It returns `{stops:[{id,start,note}], summary}`. JSON-schema output plus a validator: every id exactly once, `HH:MM` times, the day ends in time with travel, no invented numbers, length limits. Invalid output is retried at most twice, then the rule plan is used.
+6. **Repair, not trust.** The model's order is kept, but code recomputes every time:
+   - a start that leaves too little travel time from the previous stop is moved later and recorded ("Moved X from 10:00 to 11:15 to allow 15 min from Y");
+   - meals start no earlier than 12:00, and a meal reached between 15:30 and 19:00 becomes dinner at 19:00;
+   - a note that names an interest the place doesn't offer, or a time of day (morning, sunset, evening…) that the stop's scheduled midpoint doesn't fall in, is dropped;
+   - a summary that does either is replaced by a template ("Starts at A, with a meal at M and ends at B.").
+   Every repair is listed under "Fixed by code" in the day's "Why?" popover.
+7. **Travel model.** Straight-line distance; ≤ 1.2 km is a walk (×1.25 detour at 4.5 km/h + 3 min), anything longer a ride (×1.35 detour at 24 km/h + 10 min). Legs round up to 5 min.
+8. **Cache.** The raw model answer is cached per (day line, pace, stop ids). Repairs run when the cache is read, so tightened rules also fix cached plans. Regenerating a day bypasses the cache.
+9. **Edits.** The organizer moves, swaps, removes and adds stops directly; members propose the same edits. Code re-times only the changed days, and a stop keeps its time only while the stop before it is unchanged. Regenerating the whole draft marks open proposals as out of date.
+
+With `AI_ENABLED=false`, or after a timeout or invalid output, the rule plan is used with template summaries. Days, travel times and repairs are identical.
+
+Found in the live check (qwen3 4B): the model asked for "evening photos" at an 11:15 stop, and it put a seafood dinner place at 09:30 on a day of its own. Both are now repaired by code, as described in step 6.
+
 ## Benchmark
 
 <!-- ai-benchmark:start -->

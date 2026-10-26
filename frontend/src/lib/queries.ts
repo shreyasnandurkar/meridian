@@ -6,6 +6,12 @@ import { api } from "@/lib/api";
 import type {
   AddShortlistInput,
   AiJob,
+  CommentTarget,
+  Itinerary,
+  Pace,
+  PlanEdit,
+  Proposal,
+  TripComment,
   Comparison,
   ComparisonKind,
   GroupFit,
@@ -52,6 +58,9 @@ export const keys = {
   recommendations: (tripId: string, category: PlaceCategory, gems: number | null, avoidCrowds: boolean) =>
     ["trip", tripId, "recommendations", category, gems, avoidCrowds] as const,
   comparisons: (tripId: string) => ["trip", tripId, "comparisons"] as const,
+  itinerary: (tripId: string) => ["trip", tripId, "itinerary"] as const,
+  proposals: (tripId: string) => ["trip", tripId, "proposals"] as const,
+  comments: (tripId: string) => ["trip", tripId, "comments"] as const,
 };
 
 export function useVocabulary() {
@@ -431,5 +440,110 @@ export function useOptionDraft(tripId: string) {
   return useMutation({
     mutationFn: (url: string) =>
       api<OptionDraft>(`/api/trips/${tripId}/comparisons/draft?url=${encodeURIComponent(url)}`),
+  });
+}
+
+/** `null` until the organizer generates the first draft. */
+export function useItinerary(tripId: string) {
+  return useQuery({
+    queryKey: keys.itinerary(tripId),
+    queryFn: async () => (await api<Itinerary | undefined>(`/api/trips/${tripId}/itinerary`)) ?? null,
+  });
+}
+
+/** A4: generate (or replace) the draft in a background job. */
+export function useGenerateItinerary(tripId: string) {
+  return useMutation({
+    mutationFn: (pace: Pace | null) =>
+      api<AiJob<Itinerary>>(`/api/trips/${tripId}/itinerary/generate`, {
+        method: "POST",
+        body: JSON.stringify({ pace }),
+      }),
+  });
+}
+
+export function useRegenerateDay(tripId: string) {
+  return useMutation({
+    mutationFn: (day: number) =>
+      api<AiJob<Itinerary>>(`/api/trips/${tripId}/itinerary/days/${day}/regenerate`, { method: "POST" }),
+  });
+}
+
+/** Organizer edits; the server answers with the whole updated itinerary. */
+export function useEditItinerary(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (edit: PlanEdit) =>
+      api<Itinerary>(`/api/trips/${tripId}/itinerary/edits`, { method: "POST", body: JSON.stringify(edit) }),
+    onSuccess: (it) => {
+      qc.setQueryData(keys.itinerary(tripId), it);
+      qc.invalidateQueries({ queryKey: keys.proposals(tripId) });
+    },
+  });
+}
+
+export function useProposals(tripId: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.proposals(tripId),
+    queryFn: () => api<Proposal[]>(`/api/trips/${tripId}/proposals`),
+    enabled,
+  });
+}
+
+export function usePropose(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { edit: PlanEdit; reason: string | null }) =>
+      api<Proposal>(`/api/trips/${tripId}/proposals`, { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: (p) => {
+      qc.setQueryData<Proposal[]>(keys.proposals(tripId), (old) => [p, ...(old ?? [])]);
+      qc.invalidateQueries({ queryKey: keys.itinerary(tripId) });
+    },
+  });
+}
+
+export function useWithdrawProposal(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<Proposal>(`/api/trips/${tripId}/proposals/${id}/withdraw`, { method: "POST" }),
+    onSuccess: (p) => {
+      qc.setQueryData<Proposal[]>(keys.proposals(tripId), (old) => old?.map((x) => (x.id === p.id ? p : x)));
+      qc.invalidateQueries({ queryKey: keys.itinerary(tripId) });
+    },
+  });
+}
+
+export function useComments(tripId: string) {
+  return useQuery({
+    queryKey: keys.comments(tripId),
+    queryFn: () => api<TripComment[]>(`/api/trips/${tripId}/comments`),
+  });
+}
+
+function bumpCommentCounts(qc: ReturnType<typeof useQueryClient>, tripId: string) {
+  qc.invalidateQueries({ queryKey: keys.itinerary(tripId) });
+  qc.invalidateQueries({ queryKey: keys.proposals(tripId) });
+}
+
+export function useAddComment(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { targetType: CommentTarget; targetId: string; body: string }) =>
+      api<TripComment>(`/api/trips/${tripId}/comments`, { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: (c) => {
+      qc.setQueryData<TripComment[]>(keys.comments(tripId), (old) => [...(old ?? []), c]);
+      bumpCommentCounts(qc, tripId);
+    },
+  });
+}
+
+export function useDeleteComment(tripId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/api/trips/${tripId}/comments/${id}`, { method: "DELETE" }),
+    onSuccess: (_v, id) => {
+      qc.setQueryData<TripComment[]>(keys.comments(tripId), (old) => old?.filter((c) => c.id !== id));
+      bumpCommentCounts(qc, tripId);
+    },
   });
 }

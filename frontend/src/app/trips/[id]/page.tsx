@@ -19,6 +19,7 @@ import {
 import { CompareTab } from "@/components/compare/compare-tab";
 import { ErrorState } from "@/components/error-state";
 import { GroupFitTab } from "@/components/groupfit/group-fit-tab";
+import { ItineraryTab } from "@/components/itinerary/itinerary-tab";
 import { PageLoading, RequireAuth } from "@/components/require-auth";
 import { MembersTab } from "@/components/trip/members-tab";
 import { OverviewTab } from "@/components/trip/overview-tab";
@@ -136,12 +137,7 @@ function TripHub() {
           <CompareTab trip={t} />
         </TabsContent>
         <TabsContent value="itinerary">
-          <PlaceholderTab
-            icon={Route}
-            title="Itinerary"
-            body="A day-by-day draft from the shortlist that members can propose changes to."
-            milestone={5}
-          />
+          <ItineraryTab trip={t} />
         </TabsContent>
         <TabsContent value="decisions">
           <PlaceholderTab

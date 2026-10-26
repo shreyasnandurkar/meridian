@@ -20,6 +20,7 @@ import com.meridian.trip.TripAccess;
 import com.meridian.trip.TripMember;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -72,6 +73,18 @@ public class GroupFitService {
                 itemFits(group.fitMembers(), list, rs),
                 writer.current(rows),
                 writer.aiEnabled());
+    }
+
+    /** Group-fit score per shortlist item (null when nobody can be scored), for code that ranks places. */
+    @Transactional(readOnly = true)
+    public Map<UUID, Integer> scores(UUID tripId) {
+        TripGroup group = loader.load(tripId);
+        List<ShortlistItem> list = items.findByTripIdOrderByCreatedAtDesc(tripId);
+        List<Reaction> rs = list.isEmpty() ? List.of()
+                : reactions.findByIdItemIdIn(list.stream().map(ShortlistItem::getId).toList());
+        Map<UUID, Integer> out = new HashMap<>();
+        itemFits(group.fitMembers(), list, rs).forEach(f -> out.put(f.itemId(), f.score()));
+        return out;
     }
 
     /** A3 as an async job: phrase the current trade-offs (cached unless {@code regenerate}). */

@@ -50,11 +50,14 @@ export function TripMap({
   pickMode = false,
   picked,
   onPick,
+  route,
   className,
   label,
 }: {
   center: { lat: number; lng: number } | null;
   markers?: MapMarker[];
+  /** Draws a line through these points in order, e.g. one itinerary day. */
+  route?: { lat: number; lng: number }[];
   selectedId?: string | null;
   onSelect?: (id: string) => void;
   pickMode?: boolean;
@@ -187,6 +190,29 @@ export function TripMap({
       .addTo(m);
     m.easeTo({ center: [mk.lng, mk.lat], duration: 300 });
   }, [selectedId, markers, ready]);
+
+  // the route line; MapLibre paint can't read CSS variables, so resolve the signal colour now
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !ready) return;
+    const coordinates = (route ?? []).map((p) => [p.lng, p.lat]);
+    const data = { type: "Feature" as const, properties: {}, geometry: { type: "LineString" as const, coordinates } };
+    const source = m.getSource("route") as import("maplibre-gl").GeoJSONSource | undefined;
+    if (source) {
+      source.setData(data);
+      return;
+    }
+    if (coordinates.length < 2) return;
+    const color = getComputedStyle(document.documentElement).getPropertyValue("--signal").trim() || "#2563eb";
+    m.addSource("route", { type: "geojson", data });
+    m.addLayer({
+      id: "route",
+      type: "line",
+      source: "route",
+      layout: { "line-join": "round", "line-cap": "round" },
+      paint: { "line-color": color, "line-width": 3, "line-dasharray": [2, 1.5], "line-opacity": 0.85 },
+    });
+  }, [route, ready]);
 
   // the draggable pin in pick mode
   useEffect(() => {

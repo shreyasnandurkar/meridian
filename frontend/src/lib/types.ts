@@ -422,3 +422,108 @@ export interface OptionDraft {
   sourceUrl: string;
   adapter: string;
 }
+
+// ---- itinerary ------------------------------------------------------------------------------------------------
+
+export type Pace = "SLOW" | "BALANCED" | "PACKED";
+
+export interface PersonRef {
+  userId: string;
+  displayName: string;
+}
+
+export interface ItineraryStop {
+  id: string;
+  shortlistItemId: string;
+  title: string;
+  category: PlaceCategory;
+  lat: number | null;
+  lng: number | null;
+  /** "HH:MM" */
+  start: string;
+  end: string;
+  durationMin: number;
+  /** From the previous stop on the same day; 0 for the first. */
+  travelMin: number;
+  travelKm: number | null;
+  note: string | null;
+  addedBy: PersonRef;
+  addedReason: string | null;
+  commentCount: number;
+}
+
+export interface ItineraryDay {
+  index: number;
+  date: string;
+  summary: string | null;
+  provenance: Provenance;
+  repairs: string[];
+  dayStart: string;
+  dayEnd: string;
+  overflowMin: number;
+  stops: ItineraryStop[];
+}
+
+export interface UnplacedItem {
+  shortlistItemId: string;
+  title: string;
+  category: PlaceCategory;
+  reason: string;
+  placeable: boolean;
+}
+
+export interface Itinerary {
+  id: string;
+  status: "DRAFT" | "LOCKED";
+  version: number;
+  pace: Pace;
+  groupPace: Pace;
+  generatedAt: string;
+  generatedBy: PersonRef;
+  updatedAt: string;
+  days: ItineraryDay[];
+  unplaced: UnplacedItem[];
+  openProposals: number;
+  canEdit: boolean;
+  aiAvailable: boolean;
+}
+
+export type PlanEditType = "MOVE" | "SWAP" | "REMOVE" | "ADD";
+
+export interface PlanEdit {
+  type: PlanEditType;
+  itemId: string;
+  otherItemId?: string | null;
+  day?: number | null;
+  position?: number | null;
+}
+
+export type ProposalStatus = "OPEN" | "WITHDRAWN" | "APPROVED" | "REJECTED" | "STALE";
+
+export interface Proposal {
+  id: string;
+  type: PlanEditType;
+  edit: PlanEdit;
+  summary: string;
+  reason: string | null;
+  status: ProposalStatus;
+  createdBy: PersonRef;
+  createdAt: string;
+  resolvedAt: string | null;
+  current: boolean;
+  problems: string[];
+  canWithdraw: boolean;
+  commentCount: number;
+}
+
+export type CommentTarget = "SHORTLIST_ITEM" | "PROPOSAL";
+
+export interface TripComment {
+  id: string;
+  targetType: CommentTarget;
+  targetId: string;
+  author: PersonRef;
+  body: string;
+  createdAt: string;
+  canDelete: boolean;
+}

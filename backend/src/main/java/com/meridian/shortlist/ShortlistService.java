@@ -1,6 +1,9 @@
 package com.meridian.shortlist;
 
 import com.meridian.common.ApiException;
+import com.meridian.itinerary.Comment;
+import com.meridian.itinerary.CommentRepository;
+import com.meridian.itinerary.ItineraryItemRepository;
 import com.meridian.link.LinkPreviewer;
 import com.meridian.link.LinkPreviewer.LinkPreview;
 import com.meridian.link.UrlGuard;
@@ -47,10 +50,13 @@ public class ShortlistService {
     private final TripAccess access;
     private final LinkPreviewer previewer;
     private final TransactionTemplate tx;
+    private final ItineraryItemRepository itineraryItems;
+    private final CommentRepository comments;
 
     public ShortlistService(ShortlistItemRepository items, ReactionRepository reactions, PlaceRepository places,
             PlaceService placeService, UserRepository users, TripAccess access, LinkPreviewer previewer,
-            PlatformTransactionManager txManager) {
+            PlatformTransactionManager txManager, ItineraryItemRepository itineraryItems,
+            CommentRepository comments) {
         this.items = items;
         this.reactions = reactions;
         this.places = places;
@@ -59,6 +65,8 @@ public class ShortlistService {
         this.access = access;
         this.previewer = previewer;
         this.tx = new TransactionTemplate(txManager);
+        this.itineraryItems = itineraryItems;
+        this.comments = comments;
     }
 
     @Transactional(readOnly = true)
@@ -120,6 +128,10 @@ public class ShortlistService {
         TripMember me = access.requireMember(tripId, userId);
         ShortlistItem item = requireItem(tripId, itemId);
         requireEditor(item, me);
+        if (itineraryItems.existsByShortlistItemId(itemId)) {
+            throw ApiException.conflict("This place is on the itinerary. Take it off its day first, or propose that.");
+        }
+        comments.deleteByTripIdAndTargetTypeAndTargetId(tripId, Comment.Target.SHORTLIST_ITEM, itemId);
         items.delete(item);
     }
 

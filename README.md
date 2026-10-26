@@ -2,7 +2,7 @@
 
 AI-powered collaborative trip planning. A group plans one trip in a shared space; an AI learns each traveler's style, reconciles the group's preferences and proposes ad-free, non-touristy itineraries that the group votes on and edits.
 
-> Status: **Milestone 4 (group fit, recommendations & compare)**: a members × preferences matrix with agreements, trade-offs and conflicts (budgets stay private), group-fit scores for every shortlisted place, AI-phrased trade-offs, place suggestions ranked for the whole group with a hidden-gems slider and AI "why this fits", and a price comparison table with source and checked-at time. Earlier: places and a shared shortlist with a map, trips and invite links, onboarding quiz with AI travel-style profile.
+> Status: **Milestone 5 (itinerary)**: a day-by-day draft from the shortlist, grouped by area with travel times, ordered by AI one day at a time and checked by code, with a map of each day's route, organizer edits, change proposals from members and comments. Earlier: group fit, place suggestions and price comparison; places and a shared shortlist with a map; trips and invite links; onboarding quiz with AI travel-style profile.
 
 ## Run with Docker
 
@@ -50,7 +50,12 @@ Pasted links are fetched server-side only to read the page title. Private and lo
 
 All scoring rules are in `docs/AI_DESIGN.md`. With `AI_ENABLED=false` every number and ranking is identical; only the AI-written sentences are replaced by templates.
 
-## Tests
+## Itinerary
+
+The organizer generates a draft for the trip's dates. Code groups shortlisted places into days by area, picks the group's pace (the median of members' profiles, or the organizer's choice), works out travel times and leaves out what doesn't fit, with a reason. The AI then orders each day and suggests start times and a short note per stop. Code checks every time against travel and the day's hours, keeps meals at lunch or dinner time, and fixes anything that doesn't fit. Each day's "Why?" popover lists what was fixed. Days can be regenerated one at a time.
+
+The organizer can reorder stops, move them between days, remove them or add unscheduled places; times are recomputed. Members propose the same changes, with a reason, and anyone can comment on a stop or a proposal. Voting on proposals and locking the plan come in the next milestone.
+
 
 ```bash
 mvn -f backend verify        # unit + Testcontainers integration tests (needs Docker)
