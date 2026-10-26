@@ -1,8 +1,178 @@
-# Meridian
+<div align="center">
 
-AI-powered collaborative trip planning. A group plans one trip in a shared space; an AI learns each traveler's style, reconciles the group's preferences and proposes ad-free, non-touristy itineraries that the group votes on and edits.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-wordmark-dark.png">
+  <img src="docs/assets/logo-wordmark-light.png" alt="Meridian — Plan one trip, together." width="420">
+</picture>
 
-Each traveler takes a short quiz, and the AI turns it into a travel-style profile they can edit. The group builds a shortlist of OpenStreetMap places, sees where its preferences agree and conflict, gets suggestions ranked for the whole group (never by paid placement), compares prices with their source and checked-at time, and gets a draft day-by-day itinerary. Members propose changes and vote on them live. The plan can be locked only when the quorum approves it, and every decision goes in an append-only log with an AI-written summary. Nothing is booked: every option links out to its provider.
+### Group trip planning that ends in a plan everyone agreed to.
+
+Meridian learns what each traveler wants, shows the group where it agrees and where it doesn't,<br>
+suggests places locals actually go, and drafts an itinerary the group votes on before it's locked.
+
+![Java 21](https://img.shields.io/badge/Java-21-17304a?style=flat-square)
+![Spring Boot 3.5](https://img.shields.io/badge/Spring_Boot-3.5-17304a?style=flat-square)
+![Next.js 15](https://img.shields.io/badge/Next.js-15-17304a?style=flat-square)
+![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-17304a?style=flat-square)
+![Local AI via Ollama](https://img.shields.io/badge/AI-local_via_Ollama-a8306a?style=flat-square)
+![No paid placement](https://img.shields.io/badge/paid_placement-none-2f6e50?style=flat-square)
+
+[**Features**](#features) · [**How it works**](#how-it-works) · [**Try it**](#try-it-in-five-minutes) · [**AI that shows its work**](#ai-that-shows-its-work) · [**Architecture**](#architecture)
+
+<br>
+
+<img src="docs/assets/screens/landing.png" alt="Meridian landing page: Plan one trip together, without the group chat." width="900">
+
+</div>
+
+---
+
+## Why Meridian
+
+Planning a trip with friends usually means one person chasing replies across chats and tabs, then booking a package that fits nobody in particular. The places that come up first are the crowded ones, often because someone paid for them to.
+
+Meridian puts the whole group in one shared trip space instead:
+
+| The usual way | With Meridian |
+|---|---|
+| One organizer chases everyone for opinions | Everyone records their own preferences once, and the app shows who hasn't yet |
+| Rigid, one-size-fits-all packages | A day-by-day plan drafted from *this* group's places, pace and budget |
+| Lists of crowded tourist traps | Suggestions that lean toward places locals use, with a hidden-gems ↔ classics slider |
+| Rankings shaped by paid placement | No commercial signal in ranking, ever; anything sponsored is labelled |
+| "I thought we agreed…" | Votes, a quorum, and a decision log that records who chose what and why |
+
+## Our promises
+
+These rules are enforced in code, not just written down:
+
+- **Consensus before lock.** The itinerary can only be locked once enough of the group approves the current plan. An organizer override needs a written reason, and that reason is logged.
+- **Every vote weighs the same.** The app always shows who hasn't voted or filled in their preferences yet.
+- **No paid placement.** Ranking uses fit and crowd signals only. A "Sponsored" label appears whenever an option is marked as one.
+- **Every price shows its source and when it was checked.** Prices older than 24 hours are flagged as stale.
+- **You book, not us.** Every option links out to its provider. Meridian never books or takes payment.
+- **Every AI output explains itself.** It carries an **AI** badge, a "Why?" popover, and controls to regenerate or dismiss it.
+- **Private budgets stay private.** The group sees only the shared range, never what each person can spend.
+
+## How it works
+
+1. **Start a trip and invite the group.** Name it, pick the destination and dates, and share the invite link.
+2. **Everyone takes a two-minute quiz.** A few sliders plus "describe your ideal trip" become a travel-style profile. Each traveler can see and edit every field.
+3. **See where the group stands.** Group fit lays out agreements, trade-offs and conflicts in plain language, before anyone books anything.
+4. **Build the shortlist.** Add places from OpenStreetMap, paste a link or drop a pin, or accept a suggestion. Each one says who added it and why.
+5. **Get a draft itinerary.** Days are grouped by area at the group's pace, with travel time between stops.
+6. **Decide together.** Members propose changes and vote on them live. Once the group approves the plan, it locks, and the decision log records how you got there.
+
+## Features
+
+### Group fit: the whole group at a glance
+
+A members × preferences matrix shows pace, interests, budgets, crowd tolerance, must-haves and dealbreakers side by side. Each row is marked as agreed, trade-off or conflict with an icon and a word, not just a color. The AI turns the numbers into trade-offs you can talk through, each with a compromise to start from. Every place on the shortlist gets a group-fit score that says who it suits and who it doesn't.
+
+<p align="center">
+  <img src="docs/assets/screens/group-matrix.png" alt="Group fit matrix: members by preferences with conflicts and trade-offs marked" width="49%">
+  <img src="docs/assets/screens/group-fit.png" alt="AI-phrased trade-offs with a suggested compromise for each" width="49%">
+</p>
+
+### Suggestions locals would make
+
+Candidates come from OpenStreetMap around your destination and are ranked for the whole group. A **hidden gems ↔ classics** slider and an **avoid crowds** toggle push famous spots down when you want them out of the way. Each card says, in one sentence, why the place fits *your* group, plus its source, distance and tags.
+
+### A shared shortlist, on a map
+
+Add places by search, pasted link or map pin. Each item shows who added it and their reason. Members react with **love / ok / no way**, and you can filter by category, by who added it, or by group-fit score.
+
+<p align="center">
+  <img src="docs/assets/screens/suggestions.png" alt="Suggestions with a hidden-gems slider and a one-line reason each place fits" width="49%">
+  <img src="docs/assets/screens/map.png" alt="Shared shortlist on a map, with letters showing who added each place" width="49%">
+</p>
+
+### A draft itinerary that actually works on the ground
+
+Places are grouped into days by area, scheduled at the group's median pace, with realistic travel time between stops and meals at mealtimes. The AI orders and times one day at a time, and code checks every answer. Each day's "Why?" lists any fixes, and a route map shows each day's stops.
+
+### Change it together, live
+
+Members propose a move, swap, add or removal with a reason. Everyone votes, and the result updates in every open window. A change applies on its own the moment it has enough approvals and is dropped the moment it can't get them. Anyone can comment on any stop or proposal.
+
+<p align="center">
+  <img src="docs/assets/screens/itinerary.png" alt="Itinerary with the consensus gate, day tabs and a route map" width="49%">
+  <img src="docs/assets/screens/proposals.png" alt="A proposed change with live votes and the approvals still needed" width="49%">
+</p>
+
+### Lock it, and remember why
+
+The consensus gate shows exactly how many approvals the plan has and who hasn't voted. **Lock itinerary** opens only at quorum, and the organizer sets the quorum (a majority by default). Every decision goes into an append-only log with the alternatives, each vote, the reason given and a short AI summary. Each stop on the plan links to the decision that put it there.
+
+<p align="center">
+  <img src="docs/assets/screens/locked.png" alt="Locked itinerary with a link to the decision" width="49%">
+  <img src="docs/assets/screens/decisions.png" alt="Decision log entries with votes, alternatives and AI summaries" width="49%">
+</p>
+
+### Compare prices honestly
+
+Line up stays, flights or activities side by side with provider, price, currency, **when the price was checked** and a source link. Stale prices are flagged, the cheapest is marked, and "Open on provider" takes you to book it yourself.
+
+<p align="center">
+  <img src="docs/assets/screens/compare.png" alt="Price comparison table with source, checked-at time and a stale-price flag" width="80%">
+</p>
+
+## AI that shows its work
+
+Meridian runs a **small local model** (default `qwen3:4b-instruct-2507` through Ollama), so your group's preferences are never sent to an AI provider. Any OpenAI-compatible host works by changing three environment variables.
+
+The rule is simple: **code computes, the model phrases and picks.** The model only chooses from IDs it is given, every answer is checked against a schema and the real numbers, and every feature has a rule-based fallback.
+
+| | What the model does | What code does | If the model fails or is off |
+|---|---|---|---|
+| **A1 Travel-style profile** | Reads "describe your ideal trip" | Builds the profile from the quiz; keeps only interests the text supports | Profile from the quiz alone |
+| **A2 Suggestions** | Re-ranks the top 10 and writes "why this fits" | Retrieves candidates; scores fit and the anti-tourist-trap weighting | Rule ranking and template reasons |
+| **A3 Group trade-offs** | Phrases agreements and conflicts | Computes every overlap, gap and range | Template sentences |
+| **A4 Draft itinerary** | Orders and times one day per call | Clusters days, checks travel times, meal times and day length; repairs what's wrong | Rule-based day plan |
+| **A6 Decision summary** | Writes the log entry | Supplies the facts; rejects any summary whose numbers don't match | Template summary |
+
+AI runs as background jobs with live progress and a cancel button, so the app never waits on the model. Results are cached per input, and every call is logged with its prompt version, tokens, latency and validation result. The full design and benchmark results are in [`docs/AI_DESIGN.md`](docs/AI_DESIGN.md).
+
+## Try it in five minutes
+
+You need Docker and Node 22+. [Ollama](https://ollama.com) is optional: without it, every AI feature falls back to rules.
+
+```bash
+cp .env.example .env                 # optional; compose has working defaults
+ollama pull qwen3:4b-instruct-2507   # optional
+docker compose up --build
+node scripts/seed.mjs                # a ready-made demo trip, with AI results cached
+```
+
+Open **http://localhost:3000** and sign in with one of the demo travelers (the password for all four is `meridian-demo`):
+
+| Account | Travel style |
+|---|---|
+| `asha@meridian.demo` | Organizer · balanced pace · mid budget · heritage and food |
+| `meera@meridian.demo` | Slow pace · budget · vegetarian · avoids crowds |
+| `dev@meridian.demo` | Packed days · splurge · adventure and nightlife |
+| `kabir@meridian.demo` | Balanced · photography, forts, local life |
+
+The seed creates **"Goa with friends"**, a five-day trip starting 30 days from today, with:
+- 16 shortlisted places from OpenStreetMap, with reasons and reactions;
+- a stay comparison where one price is stale;
+- cached trade-offs, suggestions and a draft itinerary;
+- one decided change in the log, and one open proposal waiting for votes.
+
+`node scripts/seed.mjs --reset` starts it over.
+
+<details>
+<summary><b>Guided demo (about 10 minutes)</b></summary>
+
+<br>
+
+1. Sign up and create a trip. Open its invite link in a **private window or a second browser** (logins are per browser), join, and take the quiz to watch the AI build a profile live.
+2. Switch to **Goa with friends** as Asha. Walk through the **Shortlist** (list and map), **Group fit** and **Suggestions**, moving the hidden-gems slider.
+3. Open the **Itinerary**. The cached draft loads instantly; "Regenerate draft" shows the AI job's progress.
+4. With Asha in one window and Dev in the other, approve the open proposal. It applies at 3 of 4, live in both windows.
+5. Approve the plan in both windows. At 3 of 4, **Lock itinerary** opens for Asha. Lock it.
+6. Open **Decisions** to see the new entries with their AI summaries.
+
+</details>
 
 ## Architecture
 
@@ -40,48 +210,21 @@ flowchart LR
   Jobs -. "progress" .-> WS
 ```
 
-- **Deterministic first.** Fit scores, the anti-tourist-trap weighting, day clustering, travel times, vote counting and the consensus gate are plain code. The model reads free text (A1), re-ranks and explains (A2), phrases trade-offs (A3), orders one day at a time (A4) and writes decision summaries (A6). It only picks from ids it is given, and every answer is validated, repaired or replaced by a template. See [`docs/AI_DESIGN.md`](docs/AI_DESIGN.md).
-- **Live.** After every committed change the API publishes an event to the trip's topic. The frontend refetches what changed, so votes, proposals, the plan, decisions, comments, the shortlist and AI-job progress update in every open window.
+- **Deterministic first.** Fit scores, the anti-tourist-trap weighting, day clustering, travel times, vote counting and the consensus gate are all plain, tested code.
+- **Live by default.** After every committed change the API publishes an event to the trip's topic, and each open window refetches what changed. Only trip members can subscribe.
+- **Trustworthy records.** The decision log is append-only, enforced by the database itself. Votes and locks take a row lock, so two windows can't race each other.
 
-## Run with Docker
+| Layer | Built with |
+|---|---|
+| Frontend | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn/ui, TanStack Query, MapLibre GL, STOMP.js |
+| Backend | Java 21, Spring Boot 3.5 (Web, Security with JWT, Data JPA, WebSocket), Flyway |
+| Data | PostgreSQL 16; OpenStreetMap places cached in the database |
+| AI | Ollama, or any OpenAI-compatible endpoint, behind a single `AiClient` |
+| Infra | Docker Compose |
 
-Requirements: Docker; [Ollama](https://ollama.com) on the host for AI (optional).
+## Configuration
 
-```bash
-cp .env.example .env              # optional; compose has working defaults
-ollama pull qwen3:4b-instruct-2507  # optional: without it every AI feature falls back to rules
-docker compose up --build
-node scripts/seed.mjs             # demo trip with cached AI results (needs Node 22+)
-```
-
-- App: http://localhost:3000
-- API health: http://localhost:8080/api/health
-
-## Run locally (dev)
-
-Requirements: JDK 21, Maven 3.9+, Node 22+, Docker (for Postgres and the tests).
-
-```bash
-docker compose up -d postgres
-mvn -f backend spring-boot:run          # API on :8080
-npm --prefix frontend install
-npm --prefix frontend run dev           # UI on :3000
-```
-
-## Demo data
-
-`scripts/seed` (or `node scripts/seed.mjs`) creates, through the API:
-
-- four travelers with clearly different styles: Asha (organizer, balanced, mid budget, heritage and food), Meera (slow, budget, vegetarian, avoids crowds), Dev (packed, splurge, adventure and nightlife) and Kabir (balanced, photography, forts and local life). Everyone's password is `meridian-demo`, e.g. `asha@meridian.demo`.
-- a 5-day Goa trip starting 30 days from today, with private budgets, 16 shortlisted places from OpenStreetMap with reasons and reactions, and a stay comparison (one price stale);
-- cached AI results: the group trade-offs, suggestions for sights, food and activities, and the draft itinerary, so they load instantly in the demo;
-- one decided change in the decision log, two plan approvals, and one open proposal (Meera for, Kabir against) to decide live.
-
-It is safe to rerun: it stops if the demo trip already exists. `node scripts/seed.mjs --reset` deletes the demo trip through `docker compose exec postgres` and seeds it again. With Ollama running, the seed takes a few minutes, since each AI result is computed once.
-
-**Demo walk-through:** sign up and create a trip, then open its invite link in a second window and take the quiz there (live AI profile). Switch to the seeded trip and walk through the Shortlist (with the map), Group fit, Suggestions, the Itinerary and Decisions. Sign in as Asha and Dev in two windows and approve the open proposal; it applies at 3 of 4. Then approve the plan in both windows; at 3 of 4 the Lock button opens for Asha. Lock it, and read the new entry in Decisions.
-
-## Environment variables
+Copy `.env.example` to `.env` and change what you need. Every variable has a working default.
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -90,7 +233,7 @@ It is safe to rerun: it stops if the demo trip already exists. `node scripts/see
 | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | `meridian` | The compose Postgres container |
 | `JWT_SECRET` | dev-only value | HMAC key for tokens, at least 32 bytes |
 | `AI_ENABLED` | `true` | `false` turns every AI feature into its rule-based fallback |
-| `AI_BASE_URL` | `http://localhost:11434/v1` | OpenAI-compatible endpoint (Ollama) when the backend runs on the host |
+| `AI_BASE_URL` | `http://localhost:11434/v1` | OpenAI-compatible endpoint when the backend runs on the host |
 | `AI_BASE_URL_DOCKER` | `http://host.docker.internal:11434/v1` | The same endpoint as seen from the backend container |
 | `AI_API_KEY` | `ollama` | Any string for Ollama; a real key for hosted providers |
 | `AI_MODEL` | `qwen3:4b-instruct-2507` | Model name on that endpoint |
@@ -100,44 +243,48 @@ It is safe to rerun: it stops if the demo trip already exists. `node scripts/see
 | `OVERPASS_URL` | `https://overpass-api.de/api/interpreter` | Comma-separated mirrors, tried in order |
 | `NOMINATIM_URL` | `https://nominatim.openstreetmap.org` | Search and geocoding (can be self-hosted) |
 | `APP_BASE_URL` | `http://localhost:3000` | Invite links, CORS and the WebSocket origin |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8080` | Where the browser reaches the API (and `/ws`); baked in at frontend build time |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8080` | Where the browser reaches the API and `/ws`; baked in at frontend build time |
 
-## Running without AI
+### Running without AI
 
-Set `AI_ENABLED=false` in `.env` and restart (`docker compose up -d backend`), or just leave Ollama stopped. Every feature still works and every number, ranking, day plan and vote is identical:
+Set `AI_ENABLED=false` and restart the backend (`docker compose up -d backend`), or just leave Ollama stopped. Every feature keeps working, and every number, ranking, day plan and vote stays the same:
 
-- profiles come from the quiz answers alone (the free-text answer is not read);
-- suggestions keep the rule ranking with template "why this fits" sentences;
-- trade-offs, day summaries and decision summaries are written from templates;
+- profiles come from the quiz answers alone;
+- suggestions keep the rule ranking, with template "why this fits" sentences;
+- trade-offs, day summaries and decision summaries come from templates;
 - the itinerary uses the rule plan (nearest-neighbour route, meals at lunch and dinner).
 
-Every output shows an **AI** or **Rules** badge, and its "Why?" popover says how it was made.
+Each output's badge reads **Rules** instead of **AI**, and its "Why?" popover says so.
 
-## Features
+## Development
 
-- **Profiles (A1).** Sliders, choices and a free-text "ideal trip" become a structured profile that the traveler can see and edit. The model only adds interests it can quote from the text.
-- **Shortlist.** Add places by OpenStreetMap search, by pasting a link (only its title is read, server-side, behind an SSRF guard) or with a map pin. Each item shows who added it and why. Members react love / ok / no-way. List and map views.
-- **Group fit.** A members × preferences matrix with agreements, trade-offs and conflicts (icon, word and colour), AI-phrased trade-offs (A3), a fit score per place with who it suits and why, and who hasn't filled in preferences. Budgets stay private; the group sees only a shared range.
-- **Suggestions (A2).** Places ranked for the group with a hidden-gems ↔ classics slider and an avoid-crowds toggle. The AI re-ranks the top ten and writes "why this fits". No commercial signal exists in ranking.
-- **Compare.** Prices with provider, currency, checked-at time (stale after 24 h), source link and a Sponsored label when a member marks one. Booking always happens on the provider's site.
-- **Itinerary (A4).** Days grouped by area at the group's pace, travel times, AI order and timing one day at a time with visible repairs, a route map per day, organizer edits and member proposals, and comments.
-- **Voting and consensus.** Approve or reject proposals with equal votes; approved changes apply automatically, live in every window. Members approve the plan; "Lock itinerary" opens only at quorum and shows who hasn't voted. The organizer can override only with a logged reason. The organizer sets the quorum in Members (majority by default).
-- **Decision log (A6).** Append-only entries with the alternatives, votes, who didn't vote, the reason and an AI summary that can be regenerated or dismissed. Itinerary stops link to the decision that put them there.
-
-## Tests
+You need JDK 21, Maven 3.9+, Node 22+, and Docker (for Postgres and the integration tests).
 
 ```bash
-mvn -f backend verify        # unit + Testcontainers integration tests (needs Docker)
-npm --prefix frontend run lint
+docker compose up -d postgres
+mvn -f backend spring-boot:run          # API on :8080
+npm --prefix frontend install
+npm --prefix frontend run dev           # UI on :3000
 ```
 
-Backend tests cover the group-fit math, the anti-tourist-trap scorer, the quorum rule and vote outcomes, clustering and scheduling, A1–A6 output validation, the WebSocket authorization and the full flows through the API (AI off, OpenStreetMap faked).
+```bash
+mvn -f backend verify                   # unit + Testcontainers integration tests
+npm --prefix frontend run lint
+scripts/ai-benchmark                    # tokens/sec and JSON validity of the configured model
+```
 
-## Layout
+The backend tests cover the group-fit math, the anti-tourist-trap scorer, quorum and vote outcomes, clustering and scheduling, validation of every AI output, WebSocket authorization, and the full API flows (with AI off and OpenStreetMap faked).
 
 ```
 backend/    Spring Boot API (Java 21, Flyway, JWT, STOMP)
 frontend/   Next.js App Router + Tailwind + shadcn/ui + TanStack Query
-docs/       AI_DESIGN.md
+docs/       AI_DESIGN.md, logo and screenshots
 scripts/    seed (demo data) + ai-benchmark (model speed and JSON validity)
 ```
+
+<br>
+
+<div align="center">
+  <img src="docs/assets/logo-icon.png" alt="" width="56"><br>
+  <sub><b>Meridian</b> · plan one trip, together · map data © OpenStreetMap contributors</sub>
+</div>
